@@ -1,4 +1,4 @@
-.PHONY: clean data lint requirements train predict sync_data_to_s3 sync_data_from_s3
+.PHONY: clean data environment lint requirements train predict sync_data_to_s3 sync_data_from_s3
 
 #################################################################################
 # GLOBALS                                                                       #
@@ -9,6 +9,7 @@ BUCKET = [OPTIONAL] your-bucket-for-syncing-data (do not include 's3://')
 PROFILE = default
 PROJECT_NAME = study_ml_ops
 PYTHON_INTERPRETER = python3
+ENV_NAME = ML_Ops
 
 ifeq (,$(shell which conda))
 HAS_CONDA=False
@@ -20,14 +21,18 @@ endif
 # COMMANDS                                                                      #
 #################################################################################
 
-## Install Python Dependencies
+## Install Python dependencies with pip
 requirements: test_environment
 	$(PYTHON_INTERPRETER) -m pip install -U pip setuptools wheel
 	$(PYTHON_INTERPRETER) -m pip install -r requirements.txt
 
+## Create or update conda environment from environment.yml
+environment:
+	conda env update --name $(ENV_NAME) --file environment.yml --prune
+
 ## Make Dataset
-data: requirements
-	$(PYTHON_INTERPRETER) src/data/make_dataset.py data/raw data/processed
+data:
+	$(PYTHON_INTERPRETER) -m src.data.make_dataset data/raw data/processed
 
 ## Train XGBoost text classifier
 train:
@@ -46,21 +51,13 @@ clean:
 lint:
 	flake8 src
 
-## Upload Data to S3
+## Upload Data to S3, requires awscli in the active environment
 sync_data_to_s3:
-ifeq (default,$(PROFILE))
-	aws s3 sync data/ s3://$(BUCKET)/data/
-else
 	aws s3 sync data/ s3://$(BUCKET)/data/ --profile $(PROFILE)
-endif
 
-## Download Data from S3
+## Download Data from S3, requires awscli in the active environment
 sync_data_from_s3:
-ifeq (default,$(PROFILE))
-	aws s3 sync s3://$(BUCKET)/data/ data/
-else
 	aws s3 sync s3://$(BUCKET)/data/ data/ --profile $(PROFILE)
-endif
 
 ## Set up python interpreter environment
 create_environment:

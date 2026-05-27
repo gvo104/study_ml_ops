@@ -9,7 +9,8 @@ MLOps-проект для классификации текстов по тем�
 Выполните из папки `study_ml_ops/`:
 
 ```bash
-make requirements
+conda env update --name ML_Ops --file environment.yml --prune
+conda activate ML_Ops
 make data
 make train
 make predict TEXT="I feel sad and anxious and cannot sleep."
@@ -17,7 +18,9 @@ make predict TEXT="I feel sad and anxious and cannot sleep."
 
 Ожидаемый набор данных для обучения: `data/processed/fin_data.csv`.
 
-Если CSV уже находится в корне старого проекта `../data/fin_data.csv`, его можно поместить в шаблон так:
+`environment.yml` является основным файлом окружения проекта. `requirements.txt` лежит рядом как pip-дубликат ключевых зависимостей.
+
+Если CSV уже лежит в `data/processed/fin_data.csv`, `make data` просто завершится успешно. Если `data/raw/fin_data.csv` ещё нет, команда попробует взять старую локальную копию из `../data/fin_data.csv`. Если нужно скопировать CSV из другого места:
 
 ```bash
 python -m src.data.make_dataset ../data/fin_data.csv data/processed
@@ -53,6 +56,7 @@ study_ml_ops/
 - Пути, имена колонок и общие параметры необходимо сначала определить в `src/config.py`.
 - Графики для разведочного анализа и отчётов следует размещать в `src/visualization/`.
 - Описания принятых решений, команд и структуры проекта должны документироваться в `docs/`.
+- Исследовательские ноутбуки следует размещать в `notebooks/` с понятным номером и названием.
 
 ## Текущий пайплайн
 
@@ -83,7 +87,7 @@ study_ml_ops/
 - `docs/getting-started.rst`
 - `docs/commands.rst`
 - `docs/project-structure.rst`
-- `../PROJECT_CONTEXT.md` – контекст миграции со старой структуры.
+- `docs/migration-context.md` – контекст миграции со старой структуры.
 
 ## Исходная структура шаблона
 

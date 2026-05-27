@@ -7,7 +7,17 @@ Getting started
 Установка
 ---------
 
-Из папки ``study_ml_ops/`` установите зависимости:
+Основной файл окружения проекта: ``environment.yml``.
+
+Из папки ``study_ml_ops/`` создайте или обновите conda-окружение:
+
+.. code-block:: bash
+
+   conda env update --name ML_Ops --file environment.yml --prune
+   conda activate ML_Ops
+
+Если conda не используется, можно поставить pip-зависимости из дубликата
+``requirements.txt``:
 
 .. code-block:: bash
 
@@ -28,8 +38,11 @@ Getting started
 
    make data
 
-Если CSV лежит в старой корневой структуре проекта, например
-``../data/fin_data.csv``, скопируйте его так:
+Если ``data/processed/fin_data.csv`` уже существует, ``make data`` завершится
+без переустановки зависимостей. Если ``data/raw/fin_data.csv`` еще нет,
+команда попробует взять старую локальную копию из ``../data/fin_data.csv``.
+
+Если CSV лежит в другом месте, скопируйте его так:
 
 .. code-block:: bash
 
