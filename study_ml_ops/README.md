@@ -1,57 +1,137 @@
-Primary_Medical_Consultation
-==============================
+# Primary_Medical_Consultation
 
-Production-ready MLOps system for mental health text classification
+MLOps-проект для классификации текстов по теме психического здоровья.
 
-Project Organization
-------------
+Проект использует шаблонную структуру `study_ml_ops/` в качестве основной. Устаревшая папка `../pipeline/` сохранена как исторический слепок текущей реализации, а вся активная разработка ведётся в `src/`.
+
+## Быстрый старт
+
+Выполните из папки `study_ml_ops/`:
+
+```bash
+make requirements
+make data
+make train
+make predict TEXT="I feel sad and anxious and cannot sleep."
+```
+
+Ожидаемый набор данных для обучения: `data/processed/fin_data.csv`.
+
+Если CSV уже находится в корне старого проекта `../data/fin_data.csv`, его можно поместить в шаблон так:
+
+```bash
+python -m src.data.make_dataset ../data/fin_data.csv data/processed
+```
+
+## Структура каталогов
+
+```text
+study_ml_ops/
+├── data/
+│   ├── raw/              # исходные неизменяемые данные
+│   ├── interim/          # промежуточные преобразованные данные
+│   ├── processed/        # финальные наборы данных для моделирования
+│   └── external/         # данные из сторонних источников
+├── models/               # обученные модели и сериализованные артефакты
+├── notebooks/            # исследовательские ноутбуки
+├── reports/              # отчёты и графики
+├── docs/                 # документация Sphinx
+└── src/
+    ├── config.py         # пути, имена колонок и параметры модели
+    ├── utils.py          # общие вспомогательные функции
+    ├── data/             # скрипты подготовки данных
+    ├── features/         # предобработка и конструирование признаков
+    ├── models/           # обучение, инференс, сохранение артефактов
+    └── visualization/    # процедуры визуализации
+```
+
+## Куда добавлять новый код
+
+- Новые источники данных и логику их загрузки/подготовки следует помещать в `src/data/`.
+- Очистку текста, токенизацию, стемминг и новые признаки следует добавлять в `src/features/`.
+- Новые модели, скрипты обучения/оценки и код инференса должны находиться в `src/models/`.
+- Пути, имена колонок и общие параметры необходимо сначала определить в `src/config.py`.
+- Графики для разведочного анализа и отчётов следует размещать в `src/visualization/`.
+- Описания принятых решений, команд и структуры проекта должны документироваться в `docs/`.
+
+## Текущий пайплайн
+
+При обучении используются:
+
+- `tokens_stemmed` в качестве текстовой колонки;
+- `num_of_characters` и `num_of_sentences` как числовые признаки;
+- `status` как целевой класс;
+- TF-IDF с диапазоном n-грамм `(1, 2)`;
+- `TruncatedSVD`;
+- `RandomOverSampler`;
+- `XGBClassifier`.
+
+После обучения артефакты сохраняются в `models/xgboost/`:
+
+- `xgboost_model.pkl`
+- `vectorizer.pkl`
+- `svd.pkl`
+- `label_encoder.pkl`
+- `metadata.json`
+
+Данные, файлы моделей, JSON-метаданные, файлы баз данных и все прочие локальные артефакты исключены из системы контроля версий.
+
+## Документация
+
+Дополнительные заметки хранятся в:
+
+- `docs/getting-started.rst`
+- `docs/commands.rst`
+- `docs/project-structure.rst`
+- `../PROJECT_CONTEXT.md` – контекст миграции со старой структуры.
+
+## Исходная структура шаблона
 
     ├── LICENSE
-    ├── Makefile           <- Makefile with commands like `make data` or `make train`
-    ├── README.md          <- The top-level README for developers using this project.
+    ├── Makefile           <- Makefile с командами типа `make data` или `make train`
+    ├── README.md          <- Верхнеуровневый README для разработчиков, использующих этот проект.
     ├── data
-    │   ├── external       <- Data from third party sources.
-    │   ├── interim        <- Intermediate data that has been transformed.
-    │   ├── processed      <- The final, canonical data sets for modeling.
-    │   └── raw            <- The original, immutable data dump.
+    │   ├── external       <- Данные из сторонних источников.
+    │   ├── interim        <- Промежуточные данные, прошедшие преобразование.
+    │   ├── processed      <- Финальные канонические наборы данных для моделирования.
+    │   └── raw            <- Исходный неизменяемый дамп данных.
     │
-    ├── docs               <- A default Sphinx project; see sphinx-doc.org for details
+    ├── docs               <- Стандартный проект Sphinx; подробнее см. sphinx-doc.org
     │
-    ├── models             <- Trained and serialized models, model predictions, or model summaries
+    ├── models             <- Обученные и сериализованные модели, прогнозы моделей или сводки по моделям
     │
-    ├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
-    │                         the creator's initials, and a short `-` delimited description, e.g.
+    ├── notebooks          <- Ноутбуки Jupyter. Соглашение об именовании: номер (для упорядочивания),
+    │                         инициалы автора и короткое описание через `-`, например
     │                         `1.0-jqp-initial-data-exploration`.
     │
-    ├── references         <- Data dictionaries, manuals, and all other explanatory materials.
+    ├── references         <- Словари данных, руководства и прочие пояснительные материалы.
     │
-    ├── reports            <- Generated analysis as HTML, PDF, LaTeX, etc.
-    │   └── figures        <- Generated graphics and figures to be used in reporting
+    ├── reports            <- Сгенерированный анализ в форматах HTML, PDF, LaTeX и т.д.
+    │   └── figures        <- Сгенерированные графики и рисунки для использования в отчётах
     │
-    ├── requirements.txt   <- The requirements file for reproducing the analysis environment, e.g.
-    │                         generated with `pip freeze > requirements.txt`
+    ├── requirements.txt   <- Файл зависимостей для воспроизведения аналитического окружения,
+    │                         например, сгенерированный командой `pip freeze > requirements.txt`
     │
-    ├── setup.py           <- makes project pip installable (pip install -e .) so src can be imported
-    ├── src                <- Source code for use in this project.
-    │   ├── __init__.py    <- Makes src a Python module
+    ├── setup.py           <- делает проект устанавливаемым через pip (pip install -e .), чтобы src можно было импортировать
+    ├── src                <- Исходный код для использования в этом проекте.
+    │   ├── __init__.py    <- Делает src модулем Python
     │   │
-    │   ├── data           <- Scripts to download or generate data
-    │   │   └── make_dataset.py
+    │   ├── data           <- Скрипты для загрузки или генерации данных
+    │   │   └── make_dataset.py
     │   │
-    │   ├── features       <- Scripts to turn raw data into features for modeling
-    │   │   └── build_features.py
+    │   ├── features       <- Скрипты для преобразования сырых данных в признаки для моделирования
+    │   │   └── build_features.py
     │   │
-    │   ├── models         <- Scripts to train models and then use trained models to make
-    │   │   │                 predictions
-    │   │   ├── predict_model.py
-    │   │   └── train_model.py
+    │   ├── models         <- Скрипты для обучения моделей и последующего использования обученных моделей
+    │   │   │                 для получения прогнозов
+    │   │   ├── predict_model.py
+    │   │   └── train_model.py
     │   │
-    │   └── visualization  <- Scripts to create exploratory and results oriented visualizations
-    │       └── visualize.py
+    │   └── visualization  <- Скрипты для создания визуализаций исследовательского и итогового характера
+    │       └── visualize.py
     │
-    └── tox.ini            <- tox file with settings for running tox; see tox.readthedocs.io
+    └── tox.ini            <- Файл tox с настройками для запуска tox; см. tox.readthedocs.io
 
-
---------
+---
 
 <p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>

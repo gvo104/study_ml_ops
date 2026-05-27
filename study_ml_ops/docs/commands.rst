@@ -3,6 +3,16 @@ Commands
 
 The Makefile contains the central entry points for common tasks related to this project.
 
+Core commands
+^^^^^^^^^^^^^
+
+* ``make requirements`` installs project dependencies from ``requirements.txt``.
+* ``make data`` copies ``data/raw/fin_data.csv`` into ``data/processed/fin_data.csv``.
+* ``make train`` trains the XGBoost text classifier on ``data/processed/fin_data.csv``.
+* ``make predict TEXT="..."`` runs inference with artifacts from ``models/xgboost/``.
+* ``make lint`` runs ``flake8 src``.
+* ``make clean`` removes compiled Python files and ``__pycache__`` directories.
+
 Syncing data to S3
 ^^^^^^^^^^^^^^^^^^
 

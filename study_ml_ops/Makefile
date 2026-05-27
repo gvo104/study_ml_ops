@@ -1,4 +1,4 @@
-.PHONY: clean data lint requirements sync_data_to_s3 sync_data_from_s3
+.PHONY: clean data lint requirements train predict sync_data_to_s3 sync_data_from_s3
 
 #################################################################################
 # GLOBALS                                                                       #
@@ -28,6 +28,14 @@ requirements: test_environment
 ## Make Dataset
 data: requirements
 	$(PYTHON_INTERPRETER) src/data/make_dataset.py data/raw data/processed
+
+## Train XGBoost text classifier
+train:
+	$(PYTHON_INTERPRETER) -m src.models.train_model --data-path data/processed/fin_data.csv
+
+## Predict mental health class for TEXT='your text'
+predict:
+	$(PYTHON_INTERPRETER) -m src.models.predict_model "$(TEXT)"
 
 ## Delete all compiled Python files
 clean:

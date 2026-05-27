@@ -87,3 +87,16 @@ target/
 
 # Mypy cache
 .mypy_cache/
+
+*.csv
+*.pyc
+*.pkl
+*.json
+*.db
+*.log
+__pycache__/
+.ipynb_checkpoints/
+study_ml_ops/data/
+study_ml_ops/models/
+study_ml_ops/reports/figures/
+PROJECT_CONTEXT.md
