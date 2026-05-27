@@ -1,2 +1,6 @@
 .venv/
 *.csv
+*.pyc
+*.pkl
+*.json
+*.db
