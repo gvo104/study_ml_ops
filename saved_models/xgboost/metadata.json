@@ -1,6 +1,6 @@
 {
-  "model_type": "XGBoost",
-  "accuracy": 0.7778,
+  "accuracy": 0.7759111617312073,
+  "created_at": "2026-05-27 21:03:31.206669",
   "classes": [
     "Anxiety",
     "Bipolar",
@@ -9,16 +9,5 @@
     "Personality disorder",
     "Stress",
     "Suicidal"
-  ],
-  "n_features": 1002,
-  "tfidf_max_features": 5000,
-  "pca_components": 1000,
-  "numerical_features": 2,
-  "created_at": "2026-03-28 22:24:21.484408",
-  "parameters": {
-    "n_estimators": 500,
-    "learning_rate": 0.1,
-    "max_depth": 6,
-    "random_state": 101
-  }
+  ]
 }
