@@ -1,0 +1,5 @@
+outs:
+- md5: 52008410f030a2deb14ab4aff6e94ad7
+  size: 136831863
+  hash: md5
+  path: fin_data.csv
