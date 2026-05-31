@@ -1,7 +1,7 @@
 # local package
 -e .
 
-# external requirements
+# core ML
 click
 python-dotenv>=0.5.1
 pandas
@@ -10,7 +10,15 @@ nltk
 scikit-learn
 imbalanced-learn
 xgboost
+lightgbm
 joblib
+pyyaml
+matplotlib
+
+# serving (optional — use conda env for full MLOps stack)
+fastapi
+uvicorn
+pydantic
 
 # development and documentation
 Sphinx

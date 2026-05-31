@@ -1,4 +1,4 @@
-.PHONY: clean data environment lint requirements train predict sync_data_to_s3 sync_data_from_s3
+.PHONY: clean data environment lint requirements train predict test serve experiments dvc-repro dvc-pull sync_data_to_s3 sync_data_from_s3
 
 #################################################################################
 # GLOBALS                                                                       #
@@ -36,7 +36,27 @@ data:
 
 ## Train XGBoost text classifier
 train:
-	$(PYTHON_INTERPRETER) -m src.models.train_model --data-path data/processed/fin_data.csv
+	$(PYTHON_INTERPRETER) -m src.models.train_model --data-path data/processed/fin_data.csv --config configs/xgboost_baseline.yaml
+
+## Run all MLflow experiments (configs/experiments/*.yaml)
+experiments:
+	$(PYTHON_INTERPRETER) -m src.models.run_experiments --data-path data/processed/fin_data.csv
+
+## Run pytest suite
+test:
+	$(PYTHON_INTERPRETER) -m pytest tests/ -q
+
+## Start FastAPI inference server
+serve:
+	$(PYTHON_INTERPRETER) -m uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
+
+## Reproduce DVC pipeline (prepare + train)
+dvc-repro:
+	dvc repro
+
+## Pull datasets from DVC remote
+dvc-pull:
+	dvc pull
 
 ## Predict mental health class for TEXT='your text'
 predict:
