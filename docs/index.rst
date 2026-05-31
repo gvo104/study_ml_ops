@@ -1,10 +1,15 @@
-.. Primary_Medical_Consultation documentation master file, created by
-   sphinx-quickstart.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+.. Primary_Medical_Consultation documentation master file
 
-Primary_Medical_Consultation documentation!
-==============================================
+Primary_Medical_Consultation
+============================
+
+MLOps-проект для классификации текстов по теме mental health.
+
+Дополнительные MD-гайды (не в Sphinx toctree):
+
+- ``docs/refactoring-plan.md`` — план и статус рефакторинга
+- ``docs/mlflow-minio-setup.md`` — MinIO, MLflow, DVC, эксперименты
+- ``docs/migration-context.md`` — архив контекста миграции
 
 Contents:
 
@@ -14,8 +19,6 @@ Contents:
    getting-started
    commands
    project-structure
-
-
 
 Indices and tables
 ==================

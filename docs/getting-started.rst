@@ -2,67 +2,105 @@ Getting started
 ===============
 
 Проект предназначен для классификации текстов по категориям mental health.
-Основной рабочий код лежит в ``src/`` внутри шаблонной папки ``study_ml_ops/``.
+Production-код — в ``src/``, исследования — в ``notebooks/``.
 
 Установка
 ---------
 
-Основной файл окружения проекта: ``environment.yml``.
-
-Из папки ``study_ml_ops/`` создайте или обновите conda-окружение:
+Основной файл окружения: ``environment.yml``.
 
 .. code-block:: bash
 
    conda env update --name ML_Ops --file environment.yml --prune
    conda activate ML_Ops
+   pip install -r requirements.txt
+   pip install -r requirements-dev.txt
 
-Если conda не используется, можно поставить pip-зависимости из дубликата
-``requirements.txt``:
+Для экспериментов с LightGBM (если пакет не в conda-окружении):
 
 .. code-block:: bash
 
-   make requirements
+   pip install lightgbm
+
+Скопируйте ``.env.example`` в ``.env`` для MLflow/MinIO (опционально; без
+файла используются локальные дефолты ``minioadmin``).
 
 Подготовка данных
 -----------------
 
-Пайплайн обучения ожидает файл:
-
-.. code-block:: text
-
-   data/processed/fin_data.csv
-
-Если исходный CSV лежит в ``data/raw/fin_data.csv``, выполните:
-
 .. code-block:: bash
 
    make data
+   dvc pull    # если данные в DVC remote
 
-Если ``data/processed/fin_data.csv`` уже существует, ``make data`` завершится
-без переустановки зависимостей. Если ``data/raw/fin_data.csv`` еще нет,
-команда попробует взять старую локальную копию из ``../data/fin_data.csv``.
+Ожидаемый файл: ``data/processed/fin_data.csv``.
 
-Если CSV лежит в другом месте, скопируйте его так:
+Обучение (production)
+---------------------
 
-.. code-block:: bash
-
-   python -m src.data.make_dataset ../data/fin_data.csv data/processed
-
-Обучение
---------
+Базовый конфиг: ``configs/xgboost_baseline.yaml``. Локальные артефакты
+перезаписывают ``models/xgboost/``.
 
 .. code-block:: bash
 
+   make infra-up    # опционально: MLflow :5000, MinIO :9001
    make train
 
-Модель и связанные артефакты сохраняются в ``models/xgboost/``.
+Пакетные эксперименты (MLflow)
+--------------------------------
+
+Запускает все YAML из ``configs/experiments/`` (XGBoost, LightGBM,
+Logistic Regression, Random Forest). Локальную production-модель не
+перезаписывает. В MLflow — метрики, модель и ``evaluation/confusion_matrix.png``.
+
+.. code-block:: bash
+
+   make experiments
+   # или
+   study-mlops experiments
+
+Один эксперимент:
+
+.. code-block:: bash
+
+   python -m src.models.train_model \
+     --config configs/experiments/lightgbm_baseline.yaml
 
 Инференс
 --------
+
+CLI (модель из ``models/xgboost/``):
 
 .. code-block:: bash
 
    make predict TEXT="I feel sad and anxious and cannot sleep."
 
-Перед инференсом в ``models/xgboost/`` должны лежать сохраненные артефакты
-обученной модели.
+HTTP API:
+
+.. code-block:: bash
+
+   make serve
+   curl -X POST http://localhost:8000/predict \
+     -H "Content-Type: application/json" \
+     -d '{"text": "I feel sad and anxious."}'
+
+   curl http://localhost:8000/health
+
+Тесты и качество кода
+---------------------
+
+.. code-block:: bash
+
+   make test
+   make lint
+   tox
+
+MLOps
+-----
+
+.. code-block:: bash
+
+   make dvc-repro
+   make dvc-pull
+
+См. также ``docs/mlflow-minio-setup.md`` и ``docs/refactoring-plan.md``.
