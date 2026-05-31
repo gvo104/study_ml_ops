@@ -1,0 +1,19 @@
+model:
+  name: logistic_regression
+  C: 1.0
+  max_iter: 2000
+
+features:
+  tfidf_max_features: 5000
+  ngram_range: [1, 2]
+  svd_components: 300
+
+training:
+  test_size: 0.2
+  random_state: 101
+  oversample: true
+
+experiment:
+  run_name: logistic_baseline
+  save_local_artifacts: false
+  description: Linear baseline on TF-IDF+SVD features

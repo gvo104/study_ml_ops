@@ -1,0 +1,20 @@
+import pytest
+
+pytest.importorskip("fastapi")
+
+from fastapi.testclient import TestClient
+
+from src.api.app import app
+
+
+@pytest.fixture
+def client():
+    with TestClient(app) as test_client:
+        yield test_client
+
+
+def test_health_endpoint(client):
+    response = client.get("/health")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ok"

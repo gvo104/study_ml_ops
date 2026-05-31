@@ -39,7 +39,13 @@ make infra-down
 
 ## Переменные окружения
 
-Перед работой установи переменные (или добавь в `~/.bashrc`):
+Скопируй шаблон и при необходимости отредактируй:
+
+```bash
+cp .env.example .env
+```
+
+Или задай вручную:
 
 ```bash
 export AWS_ACCESS_KEY_ID=minioadmin
@@ -47,7 +53,10 @@ export AWS_SECRET_ACCESS_KEY=minioadmin
 export AWS_ENDPOINT_URL=http://localhost:9000
 export MLFLOW_S3_ENDPOINT_URL=http://localhost:9000
 export MLFLOW_TRACKING_URI=http://localhost:5000
+export MLFLOW_EXPERIMENT_NAME=mental_health_classification
 ```
+
+Если `.env` нет, `src/config.py` подставляет те же дефолты для локального MinIO.
 
 ---
 
@@ -84,46 +93,56 @@ dvc status        # покажет, есть ли изменения в данн
 
 ## Работа с MLflow
 
-### Настройка в Python-коде
+Логирование встроено в `src/models/trainer.py` через `src/models/tracking.py`.
+Вручную писать `mlflow.start_run()` не нужно.
 
-В начало скрипта обучения (`train_model.py`) добавь:
+### Production-обучение (локальные артефакты + MLflow)
 
-```python
-import mlflow
-import mlflow.xgboost  # или другой фреймворк
-
-mlflow.set_tracking_uri("http://localhost:5000")
-mlflow.set_experiment("название_эксперимента")
+```bash
+make infra-up
+make train
 ```
 
-### Логирование эксперимента
+Конфиг: `configs/xgboost_baseline.yaml`. Эксперимент MLflow:
+`mental_health_classification`. Run name: `xgboost_baseline`.
 
-```python
-with mlflow.start_run():
-    # Параметры
-    mlflow.log_param("max_depth", 5)
-    mlflow.log_param("learning_rate", 0.01)
+### Пакет экспериментов (только MLflow, без перезаписи `models/xgboost/`)
 
-    # Обучение модели
-    model = train_model(...)
-
-    # Метрики
-    mlflow.log_metric("accuracy", 0.85)
-    mlflow.log_metric("f1_score", 0.83)
-
-    # Модель
-    mlflow.xgboost.log_model(model, "model")
-
-    # Дополнительные артефакты
-    mlflow.log_artifact("vectorizer.pkl")
+```bash
+make experiments
 ```
 
-### Просмотр экспериментов
+Читает все `configs/experiments/*.yaml` (XGBoost, LightGBM, Logistic Regression,
+Random Forest). В конце выводит таблицу accuracy / macro_f1 и лучший run.
 
-1. Открой MLflow UI: http://localhost:5000
-2. Выбери эксперимент в левом меню
-3. Сравнивай запуски по метрикам
-4. Скачивай артефакты (модели, графики) из вкладки Artifacts
+Один конфиг:
+
+```bash
+python -m src.models.train_model --config configs/experiments/xgboost_deep.yaml
+```
+
+### Что попадает в каждый MLflow run
+
+| Путь в Artifacts | Содержимое |
+|------------------|------------|
+| `model/` | Обученная модель (flavor: xgboost / lightgbm / sklearn) |
+| `evaluation/confusion_matrix.png` | Матрица ошибок |
+| `evaluation/classification_report.txt` | Отчёт sklearn |
+| `model_bundle/` | Локальные pkl (только если `save_local_artifacts: true`) |
+
+Метрики: `accuracy`, `macro_f1`, `weighted_f1`. Параметры — из YAML-конфига.
+
+### Просмотр и сравнение
+
+1. Открой http://localhost:5000
+2. Experiment: `mental_health_classification`
+3. Сортируй по `macro_f1` или `accuracy`
+4. Artifacts → `evaluation/` → confusion matrix
+
+### Новый эксперимент
+
+Скопируй `configs/experiments/xgboost_baseline.yaml`, задай уникальный
+`experiment.run_name` и параметры `model` / `features`.
 
 ### Регистрация модели (опционально)
 
@@ -161,11 +180,12 @@ ml-team/
    git commit -m "feat(data): add fin_data"
    git push
    ```
-3. Запустить обучение:
+3. Запустить обучение и/или sweep экспериментов:
    ```bash
    make train
+   make experiments
    ```
-4. Результаты смотреть в MLflow UI
+4. Результаты смотреть в MLflow UI (вкладка Artifacts → `evaluation/`)
 
 ### Второй участник (подключается удалённо)
 
@@ -231,6 +251,13 @@ git check-ignore -v data/processed/my_file.csv.dvc
 AWS_ACCESS_KEY_ID=minioadmin AWS_SECRET_ACCESS_KEY=minioadmin aws --endpoint-url http://localhost:9000 s3 ls s3://ml-team/
 ```
 
+### `make train` падает на MLflow / NoCredentialsError
+
+1. Убедись, что `make infra-up` запущен.
+2. Скопируй `.env.example` → `.env` или полагайся на дефолты в `src/config.py`.
+3. Обучение всё равно сохранит локальные артефакты в `models/xgboost/`;
+   при ошибке S3 в логе будет warning, а не crash (после последнего обновления `tracking.py`).
+
 ---
 
 ## Полезные команды
@@ -260,21 +287,3 @@ dvc list . --dvc-only
 | `Makefile` | Команды `infra-up/down/status/logs` |
 | `.dvc/config` | Настройка S3 remote для DVC |
 | `.gitignore` | Правила игнорирования данных и артефактов |
-```
-
----
-
-## Как добавить в проект
-
-Создай файл:
-
-```bash
-touch docs/mlflow-minio-setup.md
-```
-
-Скопируй содержимое выше в этот файл. Затем закоммить:
-
-```bash
-git add docs/mlflow-minio-setup.md
-git commit -m "docs: add MLflow and MinIO setup guide"
-```

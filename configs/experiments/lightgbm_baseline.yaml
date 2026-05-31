@@ -1,0 +1,21 @@
+model:
+  name: lightgbm
+  n_estimators: 300
+  max_depth: 6
+  learning_rate: 0.1
+  num_leaves: 31
+
+features:
+  tfidf_max_features: 5000
+  ngram_range: [1, 2]
+  svd_components: 300
+
+training:
+  test_size: 0.2
+  random_state: 101
+  oversample: true
+
+experiment:
+  run_name: lightgbm_baseline
+  save_local_artifacts: false
+  description: LightGBM with default-ish hyperparameters

@@ -2,140 +2,92 @@
 
 MLOps-проект для классификации текстов по теме психического здоровья.
 
-Проект использует шаблонную структуру `study_ml_ops/` в качестве основной. Устаревшая папка `../pipeline/` сохранена как исторический слепок текущей реализации, а вся активная разработка ведётся в `src/`.
+Production-код — в `src/`. Документация: [`docs/`](docs/) (Sphinx + MD-гайды).
 
 ## Быстрый старт
-
-Выполните из папки `study_ml_ops/`:
 
 ```bash
 conda env update --name ML_Ops --file environment.yml --prune
 conda activate ML_Ops
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
+pip install lightgbm    # для LightGBM-экспериментов, если нет в conda
+
+cp .env.example .env    # опционально, MLflow/MinIO
+make infra-up           # опционально
 make data
 make train
 make predict TEXT="I feel sad and anxious and cannot sleep."
 ```
 
-Ожидаемый набор данных для обучения: `data/processed/fin_data.csv`.
+Датасет: `data/processed/fin_data.csv` (или `dvc pull`).
 
-`environment.yml` является основным файлом окружения проекта. `requirements.txt` лежит рядом как pip-дубликат ключевых зависимостей.
+## Команды
 
-Если CSV уже лежит в `data/processed/fin_data.csv`, `make data` просто завершится успешно. Если `data/raw/fin_data.csv` ещё нет, команда попробует взять старую локальную копию из `../data/fin_data.csv`. Если нужно скопировать CSV из другого места:
+| Команда | Описание |
+|---------|----------|
+| `make data` | Подготовка `data/processed/fin_data.csv` |
+| `make train` | Production-обучение → `models/xgboost/` + MLflow |
+| `make experiments` | 9 экспериментов из `configs/experiments/` → MLflow |
+| `make predict TEXT="..."` | CLI-инференс |
+| `make test` | pytest |
+| `make serve` | FastAPI http://localhost:8000 |
+| `make infra-up` | MinIO + MLflow (Docker) |
+| `make dvc-repro` | DVC: prepare → train |
+| `study-mlops experiments` | То же, что `make experiments` |
 
-```bash
-python -m src.data.make_dataset ../data/fin_data.csv data/processed
-```
+## Модели
 
-## Структура каталогов
+В YAML-конфигах поле `model.name`:
+
+| name | Описание |
+|------|----------|
+| `xgboost` | Основная production-модель |
+| `lightgbm` | Gradient boosting (нужен `lightgbm`) |
+| `logistic_regression` | Линейный baseline |
+| `random_forest` | Ансамбль деревьев |
+
+Конфиги экспериментов: [`configs/experiments/`](configs/experiments/).
+
+## Структура
 
 ```text
 study_ml_ops/
+├── configs/                 # xgboost_baseline.yaml + experiments/
 ├── data/
-│   ├── raw/              # исходные неизменяемые данные
-│   ├── interim/          # промежуточные преобразованные данные
-│   ├── processed/        # финальные наборы данных для моделирования
-│   └── external/         # данные из сторонних источников
-├── models/               # обученные модели и сериализованные артефакты
-├── notebooks/            # исследовательские ноутбуки
-├── reports/              # отчёты и графики
-├── docs/                 # документация Sphinx
-└── src/
-    ├── config.py         # пути, имена колонок и параметры модели
-    ├── utils.py          # общие вспомогательные функции
-    ├── data/             # скрипты подготовки данных
-    ├── features/         # предобработка и конструирование признаков
-    ├── models/           # обучение, инференс, сохранение артефактов
-    └── visualization/    # процедуры визуализации
+├── models/xgboost/          # артефакты после make train
+├── reports/figures/         # confusion matrix (production)
+├── src/
+│   ├── config.py, config_loader.py, cli.py
+│   ├── data/, features/, models/, api/, visualization/
+├── tests/
+├── dvc.yaml
+└── docs/
 ```
 
-## Куда добавлять новый код
+## Пайплайн признаков
 
-- Новые источники данных и логику их загрузки/подготовки следует помещать в `src/data/`.
-- Очистку текста, токенизацию, стемминг и новые признаки следует добавлять в `src/features/`.
-- Новые модели, скрипты обучения/оценки и код инференса должны находиться в `src/models/`.
-- Пути, имена колонок и общие параметры необходимо сначала определить в `src/config.py`.
-- Графики для разведочного анализа и отчётов следует размещать в `src/visualization/`.
-- Описания принятых решений, команд и структуры проекта должны документироваться в `docs/`.
-- Исследовательские ноутбуки следует размещать в `notebooks/` с понятным номером и названием.
+- Текст: `tokens_stemmed` (без повторной предобработки по умолчанию)
+- Числовые: `num_of_characters`, `num_of_sentences`
+- TF-IDF (1,2) → TruncatedSVD → RandomOverSampler → классификатор
+- Инференс: `FeatureBuilder.transform_single()` + `feature_builder.pkl`
 
-## Текущий пайплайн
+## MLOps
 
-При обучении используются:
-
-- `tokens_stemmed` в качестве текстовой колонки;
-- `num_of_characters` и `num_of_sentences` как числовые признаки;
-- `status` как целевой класс;
-- TF-IDF с диапазоном n-грамм `(1, 2)`;
-- `TruncatedSVD`;
-- `RandomOverSampler`;
-- `XGBClassifier`.
-
-После обучения артефакты сохраняются в `models/xgboost/`:
-
-- `xgboost_model.pkl`
-- `vectorizer.pkl`
-- `svd.pkl`
-- `label_encoder.pkl`
-- `metadata.json`
-
-Данные, файлы моделей, JSON-метаданные, файлы баз данных и все прочие локальные артефакты исключены из системы контроля версий.
+- **MLflow** — метрики, модель, `evaluation/confusion_matrix.png` ([гайд](docs/mlflow-minio-setup.md))
+- **DVC** — версионирование данных (`dvc pull` / `dvc push`)
+- **API** — `POST /predict` с `{"text": "..."}`
 
 ## Документация
 
-Дополнительные заметки хранятся в:
-
-- `docs/getting-started.rst`
-- `docs/commands.rst`
-- `docs/project-structure.rst`
-- `docs/migration-context.md` – контекст миграции со старой структуры.
-
-## Исходная структура шаблона
-
-    ├── LICENSE
-    ├── Makefile           <- Makefile с командами типа `make data` или `make train`
-    ├── README.md          <- Верхнеуровневый README для разработчиков, использующих этот проект.
-    ├── data
-    │   ├── external       <- Данные из сторонних источников.
-    │   ├── interim        <- Промежуточные данные, прошедшие преобразование.
-    │   ├── processed      <- Финальные канонические наборы данных для моделирования.
-    │   └── raw            <- Исходный неизменяемый дамп данных.
-    │
-    ├── docs               <- Стандартный проект Sphinx; подробнее см. sphinx-doc.org
-    │
-    ├── models             <- Обученные и сериализованные модели, прогнозы моделей или сводки по моделям
-    │
-    ├── notebooks          <- Ноутбуки Jupyter. Соглашение об именовании: номер (для упорядочивания),
-    │                         инициалы автора и короткое описание через `-`, например
-    │                         `1.0-jqp-initial-data-exploration`.
-    │
-    ├── references         <- Словари данных, руководства и прочие пояснительные материалы.
-    │
-    ├── reports            <- Сгенерированный анализ в форматах HTML, PDF, LaTeX и т.д.
-    │   └── figures        <- Сгенерированные графики и рисунки для использования в отчётах
-    │
-    ├── requirements.txt   <- Файл зависимостей для воспроизведения аналитического окружения,
-    │                         например, сгенерированный командой `pip freeze > requirements.txt`
-    │
-    ├── setup.py           <- делает проект устанавливаемым через pip (pip install -e .), чтобы src можно было импортировать
-    ├── src                <- Исходный код для использования в этом проекте.
-    │   ├── __init__.py    <- Делает src модулем Python
-    │   │
-    │   ├── data           <- Скрипты для загрузки или генерации данных
-    │   │   └── make_dataset.py
-    │   │
-    │   ├── features       <- Скрипты для преобразования сырых данных в признаки для моделирования
-    │   │   └── build_features.py
-    │   │
-    │   ├── models         <- Скрипты для обучения моделей и последующего использования обученных моделей
-    │   │   │                 для получения прогнозов
-    │   │   ├── predict_model.py
-    │   │   └── train_model.py
-    │   │
-    │   └── visualization  <- Скрипты для создания визуализаций исследовательского и итогового характера
-    │       └── visualize.py
-    │
-    └── tox.ini            <- Файл tox с настройками для запуска tox; см. tox.readthedocs.io
+| Файл | Содержание |
+|------|------------|
+| [getting-started.rst](docs/getting-started.rst) | Установка, train, experiments, API |
+| [commands.rst](docs/commands.rst) | Makefile и CLI |
+| [project-structure.rst](docs/project-structure.rst) | Модули `src/` |
+| [mlflow-minio-setup.md](docs/mlflow-minio-setup.md) | Инфраструктура и эксперименты |
+| [refactoring-plan.md](docs/refactoring-plan.md) | План рефакторинга |
 
 ---
 
-<p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>
+<p><small>Based on the <a href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science</a> template.</small></p>

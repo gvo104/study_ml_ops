@@ -1,0 +1,19 @@
+stages:
+  prepare:
+    cmd: python -m src.data.make_dataset data/raw data/processed
+    deps:
+      - src/data/make_dataset.py
+      - src/config.py
+    outs:
+      - data/processed/fin_data.csv
+
+  train:
+    cmd: python -m src.models.train_model --data-path data/processed/fin_data.csv --config configs/xgboost_baseline.yaml
+    deps:
+      - data/processed/fin_data.csv
+      - src/
+      - configs/xgboost_baseline.yaml
+    outs:
+      - models/xgboost/
+    params:
+      - configs/xgboost_baseline.yaml

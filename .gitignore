@@ -48,6 +48,10 @@ coverage.xml
 # Django stuff:
 *.log
 
+# Generated figures (logged to MLflow under evaluation/)
+reports/figures/*
+!reports/figures/.gitkeep
+
 # Sphinx documentation
 docs/_build/
 
@@ -120,6 +124,7 @@ minio_data/
 *.json
 !data/**/*.dvc        # кроме DVC-файлов
 !data/**/*.json       # кроме JSON в данных (если DVC будет использовать)
+!configs/**/*.json
 *.db
 *.log
 study_ml_ops/models/

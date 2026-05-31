@@ -1,29 +1,53 @@
 Commands
 ========
 
-The Makefile contains the central entry points for common tasks related to this project.
+Точки входа: **Makefile**, **study-mlops** CLI и модули ``python -m src.*``.
 
 Core commands
 ^^^^^^^^^^^^^
 
-* ``make environment`` creates or updates the ``ML_Ops`` conda environment from ``environment.yml``.
-* ``make requirements`` installs pip dependencies from ``requirements.txt``.
-* ``make data`` copies ``data/raw/fin_data.csv`` into ``data/processed/fin_data.csv``.
-* ``make train`` trains the XGBoost text classifier on ``data/processed/fin_data.csv``.
-* ``make predict TEXT="..."`` runs inference with artifacts from ``models/xgboost/``.
-* ``make lint`` runs ``flake8 src``.
-* ``make clean`` removes compiled Python files and ``__pycache__`` directories.
+* ``make environment`` — создать/обновить conda-окружение ``ML_Ops`` из ``environment.yml``.
+* ``make requirements`` — ``pip install -r requirements.txt``.
+* ``make data`` — скопировать ``fin_data.csv`` в ``data/processed/``.
+* ``make train`` — обучение по ``configs/xgboost_baseline.yaml``, сохранение в ``models/xgboost/``.
+* ``make experiments`` — все конфиги из ``configs/experiments/``, логирование в MLflow.
+* ``make predict TEXT="..."`` — инференс по артефактам ``models/xgboost/``.
+* ``make test`` — ``pytest tests/``.
+* ``make serve`` — FastAPI на порту 8000.
+* ``make lint`` — ``flake8 src``.
+* ``make clean`` — удалить ``__pycache__`` и ``*.pyc``.
 
-``make data`` does not install dependencies. If ``data/processed/fin_data.csv``
-already exists, it exits successfully without copying anything. If
-``data/raw/fin_data.csv`` is missing, it tries to import the legacy local copy
-from ``../data/fin_data.csv``.
+CLI (``pip install -e .``)
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Syncing data to S3
-^^^^^^^^^^^^^^^^^^
+* ``study-mlops data [input] [output]`` — подготовка данных.
+* ``study-mlops train [--config PATH]`` — обучение.
+* ``study-mlops experiments [--configs-dir DIR]`` — пакет экспериментов.
+* ``study-mlops predict "text"`` — инференс.
+* ``study-mlops infra status`` — статус Docker Compose.
 
-* ``make sync_data_to_s3`` uses ``aws s3 sync`` to sync ``data/`` to the configured bucket.
-* ``make sync_data_from_s3`` uses ``aws s3 sync`` to sync the configured bucket into ``data/``.
+Модули Python
+^^^^^^^^^^^^^
 
-These commands require ``awscli`` in the active environment. It is intentionally
-not installed by ``requirements.txt`` to avoid slow pip dependency resolution.
+* ``python -m src.data.make_dataset data/raw data/processed``
+* ``python -m src.models.train_model --config configs/xgboost_baseline.yaml``
+* ``python -m src.models.run_experiments --configs-dir configs/experiments``
+* ``python -m src.models.predict_model "your text here"``
+
+Infrastructure and DVC
+^^^^^^^^^^^^^^^^^^^^^^
+
+* ``make infra-up`` / ``infra-down`` / ``infra-status`` / ``infra-logs`` — MinIO + MLflow.
+* ``make dvc-repro`` — DVC pipeline: ``prepare`` → ``train``.
+* ``make dvc-pull`` — скачать данные из DVC remote.
+
+Переменные окружения: ``.env.example`` → ``.env``. Подробнее:
+``docs/mlflow-minio-setup.md``.
+
+Syncing data to S3 (AWS CLI)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* ``make sync_data_to_s3`` — ``aws s3 sync data/`` в bucket.
+* ``make sync_data_from_s3`` — sync из bucket в ``data/``.
+
+Требуется ``awscli`` (не в ``requirements.txt``).

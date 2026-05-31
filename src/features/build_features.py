@@ -4,17 +4,26 @@ from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 from src.config import NGRAM_RANGE, RANDOM_STATE, SVD_COMPONENTS, TFIDF_MAX_FEATURES
+from src.config_loader import FeaturesConfig
+from src.features.numerical import extract_numerical_features
+from src.features.preprocess import preprocess_single
 
 
 class FeatureBuilder:
-    def __init__(self):
-        self.vectorizer = TfidfVectorizer(
+    def __init__(self, features_config: FeaturesConfig | None = None):
+        cfg = features_config or FeaturesConfig(
+            tfidf_max_features=TFIDF_MAX_FEATURES,
             ngram_range=NGRAM_RANGE,
-            max_features=TFIDF_MAX_FEATURES,
+            svd_components=SVD_COMPONENTS,
+        )
+
+        self.vectorizer = TfidfVectorizer(
+            ngram_range=cfg.ngram_range,
+            max_features=cfg.tfidf_max_features,
         )
 
         self.svd = TruncatedSVD(
-            n_components=SVD_COMPONENTS,
+            n_components=cfg.svd_components,
             random_state=RANDOM_STATE,
         )
 
@@ -29,3 +38,12 @@ class FeatureBuilder:
         reduced = self.svd.transform(tfidf)
 
         return np.hstack([reduced, numerical_features])
+
+    def transform_single(self, raw_text: str) -> np.ndarray:
+        """Build feature vector from raw input text (inference path)."""
+        processed = preprocess_single(raw_text)
+        tfidf = self.vectorizer.transform([processed])
+        reduced = self.svd.transform(tfidf)
+        numerical = extract_numerical_features(raw_text)
+
+        return np.hstack([reduced, numerical])

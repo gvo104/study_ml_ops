@@ -1,0 +1,22 @@
+model:
+  name: xgboost
+  n_estimators: 500
+  max_depth: 10
+  learning_rate: 0.05
+  subsample: 0.8
+  colsample_bytree: 0.8
+
+features:
+  tfidf_max_features: 5000
+  ngram_range: [1, 2]
+  svd_components: 300
+
+training:
+  test_size: 0.2
+  random_state: 101
+  oversample: true
+
+experiment:
+  run_name: xgboost_deep
+  save_local_artifacts: false
+  description: Deeper XGBoost, more trees, lower learning rate

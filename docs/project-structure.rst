@@ -1,74 +1,91 @@
 Project Structure
 =================
 
-Этот документ описывает, где лежит код проекта и куда добавлять новые части
-пайплайна.
+Где лежит код и куда добавлять новые части пайплайна.
+План рефакторинга: ``docs/refactoring-plan.md``.
 
 Основные директории
 -------------------
 
-``data/raw/``
-   Исходные данные без изменений. Сюда кладутся первичные выгрузки.
+``configs/``
+   YAML-конфиги. Production: ``xgboost_baseline.yaml``.
+   Эксперименты: ``configs/experiments/*.yaml``.
 
-``data/interim/``
-   Промежуточные данные после частичной обработки.
+``data/{raw,interim,processed,external}/``
+   Данные. Train читает ``data/processed/fin_data.csv``.
 
-``data/processed/``
-   Финальные датасеты для обучения. Текущий train script ожидает
-   ``data/processed/fin_data.csv``.
+``models/xgboost/``
+   Production-артефакты после ``make train``.
 
-``models/``
-   Сериализованные модели и связанные артефакты. Текущий XGBoost pipeline
-   использует ``models/xgboost/``.
+``reports/figures/``
+   Confusion matrix после ``make train``.
+
+``reports/figures/experiments/<run_name>/``
+   Отчёты по каждому MLflow-run (не коммитятся).
 
 ``notebooks/``
-   Исследовательские ноутбуки. Сюда стоит переносить EDA и эксперименты,
-   которые не являются production-кодом. Текущий основной ноутбук:
-   ``notebooks/01-mental-health-text-classification.ipynb``.
+   EDA; логику пайплайна переносить в ``src/``.
 
-``reports/``
-   Сгенерированные отчеты, метрики и графики.
+``tests/``
+   pytest: features, preprocess, API.
 
 ``docs/``
-   Документация проекта. Контекст миграции из старой структуры лежит в
-   ``docs/migration-context.md``.
+   Sphinx (``.rst``) и MD-гайды.
 
 Модули ``src``
 --------------
 
 ``src/config.py``
-   Единое место для путей, названий колонок и параметров пайплайна.
+   Пути, dotenv, MLflow/MinIO env, имена колонок.
 
-``src/data/make_dataset.py``
-   Подготовка датасета для обучения. Сейчас копирует ``fin_data.csv`` в
-   ``data/processed/``. Если появится полноценная очистка сырых данных, ее
-   лучше добавлять здесь или в соседних модулях ``src/data/``.
+``src/config_loader.py``
+   ``ExperimentConfig`` из YAML.
 
-``src/features/preprocess.py``
-   Очистка текста, токенизация, stemming и параллельная предобработка.
+``src/cli.py``
+   Entry point ``study-mlops``.
 
-``src/features/build_features.py``
-   Построение признаков: TF-IDF, SVD и объединение с числовыми колонками.
+Data
+^^^^
 
-``src/models/train_model.py``
-   Обучение модели, оценка качества и запуск сохранения артефактов.
+``src/data/make_dataset.py`` — копирование CSV в ``processed/``.
+``src/data/loaders.py`` — загрузка + валидация.
+``src/data/validation.py`` — схема датасета.
 
-``src/models/predict_model.py``
-   Загрузка обученной модели и инференс по одному тексту.
+Features
+^^^^^^^^
 
-``src/models/artifacts.py``
-   Сохранение модели, vectorizer, SVD, label encoder и metadata.
+``src/features/preprocess.py`` — очистка, stemming.
+``src/features/numerical.py`` — числовые признаки (train = predict).
+``src/features/build_features.py`` — TF-IDF, SVD, ``transform_single``.
 
-``src/visualization/visualize.py``
-   Место для графиков и визуализаций.
+Models
+^^^^^^
 
-Правила добавления нового кода
-------------------------------
+``src/models/trainer.py`` — обучение, метрики, отчёты.
+``src/models/registry.py`` — ``save_artifacts``, ``MentalHealthPredictor``.
+``src/models/tracking.py`` — MLflow (метрики, модель, ``evaluation/``).
+``src/models/factory.py`` — ``MODEL_REGISTRY``.
+``src/models/xgboost_model.py``, ``lightgbm_model.py``, ``sklearn_models.py``.
+``src/models/run_experiments.py`` — пакетный запуск конфигов.
+``src/models/train_model.py``, ``predict_model.py`` — Click CLI.
 
-* Новую бизнес-логику не добавлять в notebooks, если она нужна пайплайну.
-* Общие параметры сначала выносить в ``src/config.py``.
-* Код подготовки данных держать в ``src/data/``.
-* Код признаков держать в ``src/features/``.
-* Код обучения, оценки, инференса и сохранения моделей держать в ``src/models/``.
-* Локальные CSV, модели, JSON metadata и DB-файлы не коммитить.
-* Старую папку ``../pipeline/`` больше не использовать для разработки; рабочий код находится в ``src/``.
+API и визуализация
+^^^^^^^^^^^^^^^^^^
+
+``src/api/`` — FastAPI ``/predict``, ``/health``.
+``src/visualization/visualize.py`` — confusion matrix, classification report.
+
+Поддерживаемые модели (``model.name`` в YAML)
+---------------------------------------------
+
+* ``xgboost``
+* ``lightgbm`` (нужен ``pip install lightgbm``)
+* ``logistic_regression``
+* ``random_forest``
+
+Правила
+-------
+
+* Гиперпараметры — в ``configs/``, не в коде.
+* Новая модель — builder в ``src/models/`` + запись в ``MODEL_REGISTRY``.
+* CSV, ``.pkl``, ``models/`` — не в Git (см. ``.gitignore``).

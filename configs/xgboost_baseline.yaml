@@ -1,0 +1,22 @@
+model:
+  name: xgboost
+  n_estimators: 300
+  max_depth: 6
+  learning_rate: 0.1
+
+features:
+  tfidf_max_features: 5000
+  ngram_range: [1, 2]
+  svd_components: 300
+
+training:
+  test_size: 0.2
+  random_state: 101
+  oversample: true
+  repreprocess_text: false
+  compute_numerical_from_raw: false
+
+experiment:
+  run_name: xgboost_baseline
+  save_local_artifacts: true
+  description: Production baseline XGBoost
