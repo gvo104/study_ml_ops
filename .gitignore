@@ -24,8 +24,6 @@ var/
 *.egg
 
 # PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
 
@@ -75,9 +73,6 @@ target/
 # Jupyter NB Checkpoints
 .ipynb_checkpoints/
 
-# exclude data from source control by default
-/data/
-
 # Mac OS-specific storage files
 .DS_Store
 
@@ -88,15 +83,45 @@ target/
 # Mypy cache
 .mypy_cache/
 
-*.csv
+# Python кэш и байткод (уже есть выше, но на всякий случай)
 *.pyc
-*.pkl
-*.json
-*.db
-*.log
 __pycache__/
 .ipynb_checkpoints/
-study_ml_ops/data/
+
+# Исключаем данные из Git (DVC будет управлять ими)
+data/processed/*.csv
+data/raw/*.csv
+data/interim/*.csv
+data/external/*.csv
+
+# НО! DVC-метафайлы (.dvc) должны быть в Git
+!data/**/*.dvc
+!data/**/.gitignore
+
+# Модели и бинарные артефакты (теперь MLflow управляет ими, не Git)
+models/xgboost/*.pkl
+models/xgboost/*.json
+!models/xgboost/.gitkeep
+!models/.gitkeep
+
+# MLflow
+mlruns/
+mlflow.db
+
+# MinIO данные (в Docker volume)
+minio_data/
+
+# DVC служебное
+.dvc/tmp
+.dvc/cache
+
+# Дополнительно — исключаем конкретные файлы и папки, которые не нужны в Git
+*.pkl
+*.json
+!data/**/*.dvc        # кроме DVC-файлов
+!data/**/*.json       # кроме JSON в данных (если DVC будет использовать)
+*.db
+*.log
 study_ml_ops/models/
 study_ml_ops/reports/figures/
 PROJECT_CONTEXT.md

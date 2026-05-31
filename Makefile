@@ -147,3 +147,29 @@ help:
 		printf "\n"; \
 	}' \
 	| more $(shell test $(shell uname) = Darwin && echo '--no-init --raw-control-chars')
+
+#################################################################################
+# INFRASTRUCTURE (Docker Compose: MinIO + MLflow)                               #
+#################################################################################
+
+## Start MinIO (S3) + MLflow tracking server
+infra-up:
+	docker compose up -d
+	@echo "============================================"
+	@echo "Infrastructure started!"
+	@echo "MinIO Console: http://localhost:9001"
+	@echo "MLflow UI:     http://localhost:5000"
+	@echo "MinIO credentials: minioadmin / minioadmin"
+	@echo "============================================"
+
+## Stop all infrastructure containers
+infra-down:
+	docker compose down
+
+## Show status of infrastructure containers
+infra-status:
+	docker compose ps
+
+## View MLflow logs
+infra-logs:
+	docker compose logs -f mlflow

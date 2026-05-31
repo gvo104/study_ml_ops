@@ -1,0 +1,10 @@
+FROM python:3.10-slim
+
+RUN pip install --no-cache-dir \
+    mlflow \
+    boto3 \
+    psycopg2-binary  # пригодится, если позже перейдёшь на PostgreSQL
+
+WORKDIR /app
+
+EXPOSE 5000
