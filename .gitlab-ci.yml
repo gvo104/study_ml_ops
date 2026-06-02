@@ -1,0 +1,90 @@
+stages:
+  - lint
+  - test
+  - build
+  - deploy
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  DOCKER_TLS_CERTDIR: "/certs"
+  DOCKER_IMAGE: "$CI_REGISTRY_IMAGE/study-mlops-api:$CI_COMMIT_SHA"
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - when: never
+
+.python_job:
+  image: python:3.11-slim
+  cache:
+    key: "$CI_COMMIT_REF_SLUG"
+    paths:
+      - .cache/pip
+  before_script:
+    - python -m pip install --upgrade pip
+    - python -m pip install -r requirements.txt -r requirements-dev.txt
+
+lint:
+  extends: .python_job
+  stage: lint
+  script:
+    - python -m flake8 src tests
+
+test:
+  extends: .python_job
+  stage: test
+  script:
+    - python -m pytest tests/ -q
+
+build_package:
+  extends: .python_job
+  stage: build
+  script:
+    - python -m build
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 week
+
+build_docker:
+  image: docker:27
+  stage: build
+  services:
+    - docker:27-dind
+  before_script:
+    - docker info
+  script:
+    - docker build -t "$DOCKER_IMAGE" .
+    - docker save "$DOCKER_IMAGE" -o study-mlops-api.tar
+  artifacts:
+    paths:
+      - study-mlops-api.tar
+    expire_in: 1 week
+
+deploy_review:
+  image: docker:27
+  stage: deploy
+  services:
+    - docker:27-dind
+  needs:
+    - job: build_docker
+      artifacts: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
+    - when: never
+  before_script:
+    - docker info
+  script:
+    - docker load -i study-mlops-api.tar
+    - docker run -d --name study-mlops-api -e CI_SMOKE_MODE=true -p 8000:8000 "$DOCKER_IMAGE"
+    - |
+      for attempt in $(seq 1 30); do
+        if wget -qO- http://127.0.0.1:8000/health; then
+          exit 0
+        fi
+        sleep 2
+      done
+      docker logs study-mlops-api
+      exit 1
