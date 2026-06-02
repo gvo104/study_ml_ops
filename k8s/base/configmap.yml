@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ml-team
+  labels:
+    name: ml-team
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: minio-config
+  namespace: ml-team
+data:
+  MINIO_ROOT_USER: "minioadmin"
+  MINIO_ROOT_PASSWORD: "minioadmin"
+  AWS_ACCESS_KEY_ID: "minioadmin"
+  AWS_SECRET_ACCESS_KEY: "minioadmin"
+  MLFLOW_S3_ENDPOINT_URL: "http://minio:9000"
+  AWS_DEFAULT_REGION: "us-east-1"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-secret
+  namespace: ml-team
+type: Opaque
+data:
+  MINIO_ROOT_USER: bWluaW9tYWRpbg==
+  MINIO_ROOT_PASSWORD: bWluaW9tYWRpbg==
+  AWS_ACCESS_KEY_ID: bWluaW9tYWRpbg==
+  AWS_SECRET_ACCESS_KEY: bWluaW9tYWRpbg==

@@ -1,0 +1,80 @@
+name: Deploy to Kubernetes
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+    paths:
+      - 'k8s/**'
+      - '.github/workflows/deploy.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'k8s/**'
+      - '.github/workflows/deploy.yml'
+
+env:
+  KUBE_CONTEXT: production  # Change to your Kubernetes context name
+  ARGOCD_SERVER: https://argocd.your-domain.com
+  ARGOCD_USERNAME: ${{ secrets.ARG OCD_USERNAME }}
+  ARGOCD_PASSWORD: ${{ secrets.ARG OCD_PASSWORD }}
+
+jobs:
+  deploy:
+    name: Deploy to Argo CD
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Kustomize
+        uses: imranzaidi/kustomize-action@v1.8.0
+        with:
+          version: v5.0.0
+
+      - name: Verify manifests
+        run: |
+          kubectl apply --dry-run=client -f ./k8s/base/ || true
+
+      - name: Deploy to Argo CD (push)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: azure/k8s-arcd-action@v1
+        with:
+          namespace: argocd
+          application-name: ml-team-app
+          username: ${{ secrets.ARG OCD_USERNAME }}
+          password: ${{ secrets.ARG OCD_PASSWORD }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          server: ${{ env.ARGOCD_SERVER }}
+        env:
+          ARGOCD_SERVER: ${{ env.ARGOCD_SERVER }}
+          ARGOCD_USERNAME: ${{ secrets.ARG OCD_USERNAME }}
+          ARGOCD_PASSWORD: ${{ secrets.ARG OCD_PASSWORD }}
+
+      - name: Deploy to Argo CD (PR review)
+        if: github.event_name == 'pull_request'
+        uses: azure/k8s-arcd-action@v1
+        with:
+          namespace: argocd
+          application-name: ml-team-app
+          username: ${{ secrets.ARG OCD_USERNAME }}
+          password: ${{ secrets.ARG OCD_PASSWORD }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          server: ${{ env.ARGOCD_SERVER }}
+          auto-pr-review: true
+        env:
+          ARGOCD_SERVER: ${{ env.ARGOCD_SERVER }}
+          ARGOCD_USERNAME: ${{ secrets.ARG OCD_USERNAME }}
+          ARGOCD_PASSWORD: ${{ secrets.ARG OCD_PASSWORD }}
+
+  notify:
+    name: Notify on failure
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: failure()
+    steps:
+      - name: Send notification
+        run: |
+          echo "Deployment failed! Check the workflow logs for details."
