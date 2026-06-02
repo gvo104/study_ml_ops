@@ -1,0 +1,111 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-init
+  namespace: ml-team
+spec:
+  ttlSecondsAfterFinished: 60
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        app: minio-init
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: minio-init
+        image: amazon/aws-cli:latest
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            configMapKeyRef:
+              name: minio-config
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            configMapKeyRef:
+              name: minio-config
+              key: AWS_SECRET_ACCESS_KEY
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            aws --endpoint-url http://minio:9000 s3 mb s3://ml-team || echo "Bucket already exists"
+            echo "Bucket ml-team is ready"
+  selector:
+    matchLabels:
+      app: minio-init
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow
+  namespace: ml-team
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mlflow
+  template:
+    metadata:
+      labels:
+        app: mlflow
+    spec:
+      containers:
+      - name: mlflow
+        image: mlflow:latest
+        ports:
+        - containerPort: 5000
+          name: server
+        env:
+        - name: MLFLOW_S3_ENDPOINT_URL
+          valueFrom:
+            configMapKeyRef:
+              name: minio-config
+              key: MLFLOW_S3_ENDPOINT_URL
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            configMapKeyRef:
+              name: minio-config
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            configMapKeyRef:
+              name: minio-config
+              key: AWS_SECRET_ACCESS_KEY
+        - name: AWS_DEFAULT_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: minio-config
+              key: AWS_DEFAULT_REGION
+        volumeMounts:
+        - name: mlflow-data
+          mountPath: /mlflow_data
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: mlflow-data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow
+  namespace: ml-team
+spec:
+  selector:
+    app: mlflow
+  ports:
+  - name: server
+    port: 5000
+    targetPort: 5000
+  type: ClusterIP
