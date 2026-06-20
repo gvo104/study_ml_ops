@@ -130,3 +130,5 @@ minio_data/
 study_ml_ops/models/
 study_ml_ops/reports/figures/
 PROJECT_CONTEXT.md
+
+drift/models
