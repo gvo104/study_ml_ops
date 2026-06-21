@@ -1,4 +1,4 @@
-.PHONY: clean data environment lint requirements train predict test serve serve-synthetic experiments dvc-repro dvc-pull sync_data_to_s3 sync_data_from_s3
+.PHONY: clean data environment lint requirements train predict test test-synthetic serve serve-synthetic experiments dvc-repro dvc-pull sync_data_to_s3 sync_data_from_s3
 
 #################################################################################
 # GLOBALS                                                                       #
@@ -45,6 +45,10 @@ experiments:
 ## Run pytest suite
 test:
 	$(PYTHON_INTERPRETER) -m pytest tests/ -q
+
+## Run only synthetic-api tests
+test-synthetic:
+	$(PYTHON_INTERPRETER) -m pytest tests/test_synthetic_api.py -q
 
 ## Start FastAPI inference server
 serve:

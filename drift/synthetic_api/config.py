@@ -2,6 +2,11 @@ from dataclasses import dataclass
 from pathlib import Path
 import os
 
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
 
 DEFAULT_MODEL_PATH = (
     Path("drift")
@@ -19,6 +24,9 @@ class SyntheticApiSettings:
     port: int = 8001
     temperature: float = 0.3
     max_retries: int = 2
+    max_tokens: int = 256
+    context_window: int = 4096
+    gpu_layers: int = -1
 
 
 def load_settings() -> SyntheticApiSettings:
@@ -34,4 +42,7 @@ def load_settings() -> SyntheticApiSettings:
         port=int(os.getenv("SYNTHETIC_API_PORT", "8001")),
         temperature=float(os.getenv("SYNTHETIC_LLM_TEMPERATURE", "0.3")),
         max_retries=int(os.getenv("SYNTHETIC_LLM_MAX_RETRIES", "2")),
+        max_tokens=int(os.getenv("SYNTHETIC_LLM_MAX_TOKENS", "256")),
+        context_window=int(os.getenv("SYNTHETIC_LLM_CONTEXT_WINDOW", "4096")),
+        gpu_layers=int(os.getenv("SYNTHETIC_LLM_GPU_LAYERS", "-1")),
     )

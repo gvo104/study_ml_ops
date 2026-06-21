@@ -68,7 +68,7 @@ class ExpertResponse(BaseModel):
 
     role: Literal["expert"]
     label: str
-    confidence: float
+    confidence: float = Field(..., ge=0.0, le=1.0)
     reason: str
 
 

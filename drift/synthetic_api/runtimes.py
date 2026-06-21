@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 from typing import Protocol
 
+from pydantic import ValidationError
+
 from drift.synthetic_api.prompts import (
     build_expert_system_prompt,
     build_expert_user_prompt,
@@ -137,10 +139,16 @@ class LlamaCppRuntime:
         model_path: Path,
         temperature: float = 0.3,
         max_retries: int = 2,
+        max_tokens: int = 256,
+        context_window: int = 4096,
+        gpu_layers: int = -1,
     ):
         self.model_path = Path(model_path)
         self.temperature = temperature
         self.max_retries = max_retries
+        self.max_tokens = max_tokens
+        self.context_window = context_window
+        self.gpu_layers = gpu_layers
         self._model = self._load_model()
         self.loaded = True
 
@@ -161,6 +169,8 @@ class LlamaCppRuntime:
         return Llama(
             model_path=str(self.model_path),
             chat_format="chatml",
+            n_ctx=self.context_window,
+            n_gpu_layers=self.gpu_layers,
             verbose=False,
         )
 
@@ -170,13 +180,13 @@ class LlamaCppRuntime:
                 system_prompt=build_generator_system_prompt(),
                 user_prompt=build_generator_user_prompt(payload),
             )
-            return GeneratorResponse(**data)
+            return self._build_generator_response(payload, data)
 
         data = await self._complete_json(
             system_prompt=build_expert_system_prompt(),
             user_prompt=build_expert_user_prompt(payload),
         )
-        return ExpertResponse(**data)
+        return self._build_expert_response(data)
 
     async def _complete_json(
         self,
@@ -189,12 +199,14 @@ class LlamaCppRuntime:
 
         for _ in range(self.max_retries + 1):
             try:
-                response = self._model.create_chat_completion(
+                response = await asyncio.to_thread(
+                    self._model.create_chat_completion,
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": current_prompt},
                     ],
                     temperature=self.temperature,
+                    max_tokens=self.max_tokens,
                     response_format={"type": "json_object"},
                 )
                 raw_response = response["choices"][0]["message"]["content"]
@@ -207,12 +219,46 @@ class LlamaCppRuntime:
             f"Failed to produce valid JSON after retries: {last_error}"
         )
 
+    def _build_generator_response(
+        self,
+        payload: GeneratorRequest,
+        data: dict,
+    ) -> GeneratorResponse:
+        normalized = dict(data)
+        normalized["role"] = "generator"
+        normalized["target_label"] = payload.target_label
+        normalized["phase"] = payload.phase
+
+        try:
+            return GeneratorResponse(**normalized)
+        except ValidationError as exc:
+            raise RuntimeErrorWithContext(
+                f"Generator response validation failed: {exc}"
+            ) from exc
+
+    def _build_expert_response(self, data: dict) -> ExpertResponse:
+        normalized = dict(data)
+        normalized["role"] = "expert"
+        confidence = normalized.get("confidence")
+        if isinstance(confidence, (int, float)) and confidence > 1:
+            normalized["confidence"] = confidence / 100.0
+
+        try:
+            return ExpertResponse(**normalized)
+        except ValidationError as exc:
+            raise RuntimeErrorWithContext(
+                f"Expert response validation failed: {exc}"
+            ) from exc
+
 
 def build_runtime(
     backend: str,
     model_path: Path,
     temperature: float,
     max_retries: int,
+    max_tokens: int = 256,
+    context_window: int = 4096,
+    gpu_layers: int = -1,
 ) -> SerializedRuntime:
     if backend == "mock":
         return SerializedRuntime(MockLlmRuntime())
@@ -222,6 +268,9 @@ def build_runtime(
                 model_path=model_path,
                 temperature=temperature,
                 max_retries=max_retries,
+                max_tokens=max_tokens,
+                context_window=context_window,
+                gpu_layers=gpu_layers,
             )
         )
 
