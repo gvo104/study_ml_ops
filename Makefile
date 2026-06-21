@@ -1,4 +1,4 @@
-.PHONY: clean data environment lint requirements train predict test test-synthetic test-drift serve serve-synthetic run-drift-debug run-drift-full experiments dvc-repro dvc-pull sync_data_to_s3 sync_data_from_s3
+.PHONY: clean data environment lint requirements train predict test test-synthetic test-drift test-monitoring serve serve-synthetic serve-drift-exporter run-drift-debug run-drift-full experiments dvc-repro dvc-pull sync_data_to_s3 sync_data_from_s3 monitoring-up monitoring-down monitoring-status
 
 #################################################################################
 # GLOBALS                                                                       #
@@ -54,6 +54,10 @@ test-synthetic:
 test-drift:
 	$(PYTHON_INTERPRETER) -m pytest tests/test_drift_runner.py -q
 
+## Run only drift monitoring exporter tests
+test-monitoring:
+	$(PYTHON_INTERPRETER) -m pytest tests/test_drift_monitoring.py -q
+
 ## Start FastAPI inference server
 serve:
 	$(PYTHON_INTERPRETER) -m uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
@@ -61,6 +65,10 @@ serve:
 ## Start synthetic FastAPI service for generator/expert roles
 serve-synthetic:
 	$(PYTHON_INTERPRETER) -m uvicorn drift.synthetic_api.app:app --reload --host $${SYNTHETIC_API_HOST:-0.0.0.0} --port $${SYNTHETIC_API_PORT:-8001}
+
+## Start drift Prometheus exporter locally
+serve-drift-exporter:
+	$(PYTHON_INTERPRETER) -m uvicorn drift.monitoring.app:app --reload --host $${DRIFT_EXPORTER_HOST:-0.0.0.0} --port $${DRIFT_EXPORTER_PORT:-9108}
 
 ## Run drift-runner in debug mode
 run-drift-debug:
@@ -213,3 +221,15 @@ infra-status:
 ## View MLflow logs
 infra-logs:
 	docker compose logs -f mlflow
+
+## Start Prometheus + Grafana + drift exporter
+monitoring-up:
+	docker compose -f docker-compose.monitoring.yml up -d
+
+## Stop Prometheus + Grafana + drift exporter
+monitoring-down:
+	docker compose -f docker-compose.monitoring.yml down
+
+## Show monitoring stack container status
+monitoring-status:
+	docker compose -f docker-compose.monitoring.yml ps

@@ -19,6 +19,7 @@ matplotlib
 fastapi
 uvicorn
 pydantic
+prometheus-client
 
 # development and documentation
 Sphinx
