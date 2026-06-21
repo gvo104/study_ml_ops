@@ -1,0 +1,50 @@
+predict_api_url: http://127.0.0.1:8000
+synthetic_api_url: http://127.0.0.1:8001
+data_path: data/processed/fin_data.csv
+training_config_path: configs/xgboost_baseline.yaml
+reference_dir: drift/reference/current
+output_root: drift/artifacts/runs
+expert_allowed_labels:
+  - Anxiety
+  - Bipolar
+  - Depression
+  - Normal
+  - Personality disorder
+  - Stress
+  - Suicidal
+max_generation_attempts_per_sample: 5
+top_k_tokens: 500
+top_k_label_tokens: 50
+min_examples_per_class_for_association: 5
+min_classes_for_association_metric: 3
+random_seed: 101
+request_timeout_seconds: 30
+target_shift_distribution:
+  Anxiety: 0.25
+  Bipolar: 0.04
+  Depression: 0.20
+  Normal: 0.08
+  Personality disorder: 0.04
+  Stress: 0.35
+  Suicidal: 0.04
+profiles:
+  debug:
+    window_size: 20
+    step_size: 5
+    exploratory_thresholds: true
+    phase_counts:
+      A_baseline: 40
+      B_lexical: 10
+      C_target_shift: 10
+      D_association: 10
+      A_recovery: 10
+  full:
+    window_size: 100
+    step_size: 10
+    exploratory_thresholds: false
+    phase_counts:
+      A_baseline: 300
+      B_lexical: 120
+      C_target_shift: 120
+      D_association: 120
+      A_recovery: 120
