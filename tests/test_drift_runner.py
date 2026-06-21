@@ -89,8 +89,12 @@ def test_load_runner_config_debug_and_full():
 
     assert debug.profile.window_size == 20
     assert debug.profile.exploratory_thresholds is True
+    assert debug.profile.target_label_strategy == "balanced"
+    assert debug.profile.min_examples_per_class_for_association == 3
+    assert debug.profile.min_classes_for_association_metric == 2
     assert full.profile.window_size == 100
     assert full.profile.exploratory_thresholds is False
+    assert full.profile.target_label_strategy == "reference"
 
 
 def test_build_phase_sequence():
@@ -107,6 +111,21 @@ def test_choose_target_label_prefers_distribution():
         config,
     )
     assert label in config.target_shift_distribution
+
+
+def test_choose_target_label_uses_balanced_strategy_in_debug():
+    config = load_runner_config("drift/configs/runner.yaml", "debug")
+    labels = {
+        choose_target_label(
+            "A_baseline",
+            __import__("random").Random(seed),
+            {"Anxiety": 1.0},
+            config,
+        )
+        for seed in range(20)
+    }
+    assert len(labels) > 1
+    assert labels.issubset(set(config.expert_allowed_labels))
 
 
 def test_build_preprocessed_record():
@@ -218,6 +237,48 @@ def test_compute_window_metrics_and_status():
     assert "token_distribution_jsd" in metrics
     assert "target_distribution_jsd" in metrics
     assert "overall_status" in status
+    assert thresholds["metrics"]["model_expert_macro_f1"]["direction"] == "lower_is_worse"
+
+
+def test_thresholds_use_lower_tail_for_macro_f1():
+    baseline_windows = [
+        {"model_expert_macro_f1": 0.9},
+        {"model_expert_macro_f1": 0.8},
+        {"model_expert_macro_f1": 0.7},
+        {"model_expert_macro_f1": 0.6},
+        {"model_expert_macro_f1": 0.5},
+    ]
+    for window in baseline_windows:
+        window.update(
+            {
+                "token_distribution_jsd": 0.1,
+                "target_distribution_jsd": 0.1,
+                "model_expert_disagreement_rate": 0.1,
+                "token_label_association_drift": 0.1,
+            }
+        )
+
+    thresholds = compute_thresholds(
+        baseline_windows=baseline_windows,
+        exploratory_thresholds=True,
+    )
+    f1_thresholds = thresholds["metrics"]["model_expert_macro_f1"]
+
+    assert f1_thresholds["warning"] < 0.7
+    assert f1_thresholds["critical"] <= f1_thresholds["warning"]
+
+    ok_status = classify_window_status(
+        {
+            "model_expert_macro_f1": 0.85,
+            "token_distribution_jsd": 0.1,
+            "target_distribution_jsd": 0.1,
+            "model_expert_disagreement_rate": 0.1,
+            "token_label_association_drift": 0.1,
+            "token_label_association_status": "ok",
+        },
+        thresholds,
+    )
+    assert ok_status["metric_statuses"]["model_expert_macro_f1"] == "ok"
 
 
 def test_build_windows():
@@ -288,7 +349,12 @@ def test_run_drift_monitoring_debug_mode(tmp_path):
     )
     assert summary["mode"] == "debug"
     assert summary["accepted_samples"] > 0
+    assert "accept_rate" in summary
+    assert "accept_rate_by_label" in summary
+    assert "model_expert_disagreement_by_label" in summary
     run_dir = next((tmp_path / "artifacts").iterdir())
     assert (run_dir / "accepted_samples.jsonl").exists()
+    assert (run_dir / "label_diagnostics.json").exists()
     assert (run_dir / "run_summary.json").exists()
+    assert (run_dir / "run_report.md").exists()
     assert (run_dir / "prom_metrics_latest.json").exists()
