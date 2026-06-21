@@ -132,3 +132,5 @@ study_ml_ops/reports/figures/
 PROJECT_CONTEXT.md
 
 drift/models
+reference/
+drift/artifacts/
