@@ -96,6 +96,7 @@ def _attempt_build_sample(
         if expert["label"] != target_label:
             rejected_records.append(
                 {
+                    "outcome": "rejected",
                     "sample_id": sample_id,
                     "phase": phase_name,
                     "target_label": target_label,
@@ -112,6 +113,7 @@ def _attempt_build_sample(
         preprocessed = build_preprocessed_record(text)
         prediction = predict_client.predict(text)
         return {
+            "outcome": "accepted",
             "sample_id": sample_id,
             "phase": phase_name,
             "target_label": target_label,
@@ -132,6 +134,7 @@ def _attempt_build_sample(
 
     rejected_records.append(
         {
+            "outcome": "rejected",
             "sample_id": sample_id,
             "phase": phase_name,
             "target_label": target_label,

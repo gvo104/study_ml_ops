@@ -32,11 +32,12 @@ def choose_target_label(
     reference_distribution: dict[str, float],
     config: RunnerConfig,
 ) -> str:
-    distribution = (
-        config.target_shift_distribution
-        if phase_name == "C_target_shift"
-        else reference_distribution
-    )
+    if phase_name == "C_target_shift":
+        distribution = config.target_shift_distribution
+    elif config.profile.target_label_strategy == "balanced":
+        distribution = _build_balanced_distribution(config.expert_allowed_labels)
+    else:
+        distribution = reference_distribution
     return _sample_from_distribution(distribution, rng)
 
 
@@ -48,3 +49,10 @@ def _sample_from_distribution(
     labels = [item[0] for item in items]
     weights = [distribution[label] for label in labels]
     return rng.choices(labels, weights=weights, k=1)[0]
+
+
+def _build_balanced_distribution(labels: list[str]) -> dict[str, float]:
+    if not labels:
+        return {}
+    weight = 1.0 / len(labels)
+    return {label: weight for label in labels}

@@ -11,6 +11,15 @@ from sklearn.metrics import f1_score
 from src.config import TARGET_COLUMN, TEXT_COLUMN
 
 
+METRIC_DIRECTIONS = {
+    "token_distribution_jsd": "higher_is_worse",
+    "target_distribution_jsd": "higher_is_worse",
+    "model_expert_disagreement_rate": "higher_is_worse",
+    "model_expert_macro_f1": "lower_is_worse",
+    "token_label_association_drift": "higher_is_worse",
+}
+
+
 def compute_window_metrics(
     window_df: pd.DataFrame,
     reference_stats: dict[str, Any],
@@ -198,29 +207,33 @@ def compute_thresholds(
     baseline_windows: list[dict[str, Any]],
     exploratory_thresholds: bool,
 ) -> dict[str, Any]:
-    metric_names = [
-        "token_distribution_jsd",
-        "target_distribution_jsd",
-        "model_expert_disagreement_rate",
-        "model_expert_macro_f1",
-        "token_label_association_drift",
-    ]
     thresholds: dict[str, Any] = {
         "exploratory_thresholds": exploratory_thresholds,
         "metrics": {},
     }
-    for name in metric_names:
+    for name, direction in METRIC_DIRECTIONS.items():
         values = [
             window[name]
             for window in baseline_windows
             if window.get(name) is not None
         ]
         if not values:
-            thresholds["metrics"][name] = {"warning": None, "critical": None}
+            thresholds["metrics"][name] = {
+                "warning": None,
+                "critical": None,
+                "direction": direction,
+            }
             continue
+        if direction == "lower_is_worse":
+            warning = float(np.percentile(values, 5))
+            critical = float(np.percentile(values, 1))
+        else:
+            warning = float(np.percentile(values, 95))
+            critical = float(np.percentile(values, 99))
         thresholds["metrics"][name] = {
-            "warning": float(np.percentile(values, 95)),
-            "critical": float(np.percentile(values, 99)),
+            "warning": warning,
+            "critical": critical,
+            "direction": direction,
         }
     return thresholds
 
@@ -244,7 +257,7 @@ def classify_window_status(
             statuses[metric_name] = "unavailable"
             continue
 
-        if metric_name == "model_expert_macro_f1":
+        if threshold["direction"] == "lower_is_worse":
             if value <= threshold["critical"]:
                 statuses[metric_name] = "critical"
                 critical_hits += 1

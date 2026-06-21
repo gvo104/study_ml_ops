@@ -32,6 +32,9 @@ profiles:
     window_size: 20
     step_size: 5
     exploratory_thresholds: true
+    target_label_strategy: balanced
+    min_examples_per_class_for_association: 3
+    min_classes_for_association_metric: 2
     phase_counts:
       A_baseline: 40
       B_lexical: 10
@@ -42,6 +45,9 @@ profiles:
     window_size: 100
     step_size: 10
     exploratory_thresholds: false
+    target_label_strategy: reference
+    min_examples_per_class_for_association: 5
+    min_classes_for_association_metric: 3
     phase_counts:
       A_baseline: 300
       B_lexical: 120

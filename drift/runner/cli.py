@@ -18,6 +18,7 @@ from drift.runner.prom_metrics import build_prom_metrics_latest
 from drift.runner.reference import ensure_reference_snapshot
 from drift.runner.reporting import (
     append_jsonl,
+    build_label_diagnostics,
     create_run_output_dir,
     write_json,
     write_markdown_report,
@@ -111,6 +112,11 @@ def run_drift_monitoring(
         append_jsonl(metrics_path, enriched)
 
     latest_window = final_window_metrics[-1] if final_window_metrics else None
+    label_diagnostics = build_label_diagnostics(
+        accepted_records=stream.accepted,
+        rejected_records=stream.rejected,
+        window_metrics=final_window_metrics,
+    )
     prom_metrics = build_prom_metrics_latest(
         run_id=run_id,
         mode=config.mode,
@@ -126,6 +132,11 @@ def run_drift_monitoring(
         "exploratory_thresholds": config.profile.exploratory_thresholds,
         "accepted_samples": len(stream.accepted),
         "rejected_samples": len(stream.rejected),
+        "accept_rate": label_diagnostics["accept_rate"],
+        "accept_rate_by_label": label_diagnostics["accept_rate_by_label"],
+        "model_expert_disagreement_by_label": label_diagnostics[
+            "model_expert_disagreement_by_label"
+        ],
         "reference_rows": len(reference_df),
         "window_count": len(final_window_metrics),
         "thresholds": thresholds,
@@ -133,11 +144,13 @@ def run_drift_monitoring(
     }
 
     write_json(output_dir / "run_summary.json", summary)
+    write_json(output_dir / "label_diagnostics.json", label_diagnostics)
     write_json(output_dir / "prom_metrics_latest.json", prom_metrics)
     write_markdown_report(
         output_dir / "run_report.md",
         summary=summary,
         window_metrics=final_window_metrics,
+        label_diagnostics=label_diagnostics,
     )
     return summary
 
@@ -153,8 +166,8 @@ def _calculate_window_metrics(
             window,
             reference_stats=reference_stats,
             top_k_tokens=config.top_k_tokens,
-            min_examples_per_class=config.min_examples_per_class_for_association,
-            min_classes=config.min_classes_for_association_metric,
+            min_examples_per_class=config.profile.min_examples_per_class_for_association,
+            min_classes=config.profile.min_classes_for_association_metric,
         )
         phase = _majority_phase(window)
         results.append(

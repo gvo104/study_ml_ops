@@ -16,6 +16,9 @@ class ProfileConfig:
     step_size: int
     phase_counts: dict[str, int]
     exploratory_thresholds: bool
+    target_label_strategy: str
+    min_examples_per_class_for_association: int
+    min_classes_for_association_metric: int
 
 
 @dataclass(frozen=True)
@@ -31,8 +34,6 @@ class RunnerConfig:
     max_generation_attempts_per_sample: int
     top_k_tokens: int
     top_k_label_tokens: int
-    min_examples_per_class_for_association: int
-    min_classes_for_association_metric: int
     random_seed: int
     request_timeout_seconds: float
     target_shift_distribution: dict[str, float]
@@ -55,6 +56,15 @@ def load_runner_config(path: Path | str, mode: str) -> RunnerConfig:
         step_size=profile_raw["step_size"],
         phase_counts=dict(profile_raw["phase_counts"]),
         exploratory_thresholds=bool(profile_raw["exploratory_thresholds"]),
+        target_label_strategy=profile_raw.get("target_label_strategy", "reference"),
+        min_examples_per_class_for_association=profile_raw.get(
+            "min_examples_per_class_for_association",
+            raw["min_examples_per_class_for_association"],
+        ),
+        min_classes_for_association_metric=profile_raw.get(
+            "min_classes_for_association_metric",
+            raw["min_classes_for_association_metric"],
+        ),
     )
 
     target_shift_distribution = dict(raw["target_shift_distribution"])
@@ -74,12 +84,6 @@ def load_runner_config(path: Path | str, mode: str) -> RunnerConfig:
         max_generation_attempts_per_sample=raw["max_generation_attempts_per_sample"],
         top_k_tokens=raw["top_k_tokens"],
         top_k_label_tokens=raw["top_k_label_tokens"],
-        min_examples_per_class_for_association=raw[
-            "min_examples_per_class_for_association"
-        ],
-        min_classes_for_association_metric=raw[
-            "min_classes_for_association_metric"
-        ],
         random_seed=raw.get("random_seed", 101),
         request_timeout_seconds=float(raw.get("request_timeout_seconds", 30.0)),
         target_shift_distribution=target_shift_distribution,
