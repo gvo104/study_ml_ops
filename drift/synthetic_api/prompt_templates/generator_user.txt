@@ -1,0 +1,19 @@
+Task: generate one patient message in JSON.
+
+Target label: {target_label}
+Phase: {phase}
+Length: {length}
+Style: {style}
+
+Phase guide:
+{phase_guide}
+
+Status guide:
+{status_guide}
+
+Requirements:
+- Write only the patient message text, not advice and not a diagnosis.
+- Match the target label clearly but naturally.
+- Keep the wording realistic and short enough for ordinary user input.
+- Return keys exactly: role, text, target_label, phase.
+- Use role="generator", target_label="{target_label}", phase="{phase}".

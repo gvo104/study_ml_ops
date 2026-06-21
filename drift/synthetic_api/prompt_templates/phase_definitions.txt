@@ -1,0 +1,4 @@
+- A: close to baseline training language and tone.
+- B: same condition, but wording and vocabulary shift.
+- C: same language style, but class frequency is changing.
+- D: words partly overlap with baseline, but label associations drift.
