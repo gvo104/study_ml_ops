@@ -15,92 +15,25 @@
       }
     ]
   },
-  "editable": false,
+  "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
   "id": null,
   "links": [],
+  "liveNow": false,
   "panels": [
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [
-            {
-              "options": {
-                "0": {
-                  "text": "ok"
-                },
-                "1": {
-                  "text": "warning"
-                },
-                "2": {
-                  "text": "critical"
-                }
-              },
-              "type": "value"
-            }
-          ],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 2
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
+      "collapsed": false,
       "gridPos": {
-        "h": 5,
-        "w": 6,
+        "h": 1,
+        "w": 24,
         "x": 0,
         "y": 0
       },
       "id": 1,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "11.2.2",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "drift_window_status_code",
-          "refId": "A"
-        }
-      ],
-      "title": "Current Status",
-      "type": "stat"
+      "panels": [],
+      "title": "1. Live Service Overview",
+      "type": "row"
     },
     {
       "datasource": {
@@ -109,15 +42,25 @@
       },
       "fieldConfig": {
         "defaults": {
-          "decimals": 0
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 6,
-        "y": 0
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 1
       },
       "id": 2,
       "options": {
@@ -132,16 +75,21 @@
           "fields": "",
           "values": false
         },
-        "textMode": "value_and_name"
+        "textMode": "auto"
       },
-      "pluginVersion": "11.2.2",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
-          "expr": "drift_window_index",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "drift_window_index{run_id=~\"$run_id\",phase=~\"$phase\"}",
+          "legendFormat": "current window",
           "refId": "A"
         }
       ],
-      "title": "Latest Window",
+      "title": "Current Replay Window",
       "type": "stat"
     },
     {
@@ -149,6 +97,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "0=ok, 1=warning, 2=critical, 3=insufficient_data.",
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
@@ -156,27 +105,58 @@
             {
               "options": {
                 "0": {
-                  "text": "present"
+                  "color": "green",
+                  "index": 0,
+                  "text": "ok"
                 },
                 "1": {
+                  "color": "yellow",
+                  "index": 1,
+                  "text": "warning"
+                },
+                "2": {
+                  "color": "red",
+                  "index": 2,
+                  "text": "critical"
+                },
+                "3": {
+                  "color": "blue",
+                  "index": 3,
                   "text": "insufficient"
                 }
               },
               "type": "value"
             }
-          ]
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          }
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 12,
-        "y": 0
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 1
       },
       "id": 3,
       "options": {
-        "colorMode": "value",
+        "colorMode": "background",
         "graphMode": "none",
         "justifyMode": "center",
         "orientation": "auto",
@@ -187,16 +167,21 @@
           "fields": "",
           "values": false
         },
-        "textMode": "value_and_name"
+        "textMode": "auto"
       },
-      "pluginVersion": "11.2.2",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
-          "expr": "drift_insufficient_data_flag",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "drift_window_status_code{source=\"latest\",run_id=~\"$run_id\",phase=~\"$phase\"}",
+          "legendFormat": "{{phase}}",
           "refId": "A"
         }
       ],
-      "title": "Association Data Flag",
+      "title": "Current Overall Status",
       "type": "stat"
     },
     {
@@ -207,15 +192,24 @@
       "fieldConfig": {
         "defaults": {
           "decimals": 0,
-          "unit": "dateTimeAsIso"
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
-        "w": 6,
-        "x": 18,
-        "y": 0
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 1
       },
       "id": 4,
       "options": {
@@ -230,16 +224,21 @@
           "fields": "",
           "values": false
         },
-        "textMode": "value_and_name"
+        "textMode": "auto"
       },
-      "pluginVersion": "11.2.2",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
-          "expr": "drift_metrics_last_update_timestamp",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "count(drift_window_info{run_id=~\"$run_id\",phase=~\"$phase\"})",
+          "legendFormat": "windows",
           "refId": "A"
         }
       ],
-      "title": "Metrics Updated At",
+      "title": "Window Count",
       "type": "stat"
     },
     {
@@ -249,21 +248,40 @@
       },
       "fieldConfig": {
         "defaults": {
-          "decimals": 4
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 300
+              }
+            ]
+          },
+          "unit": "s"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 7,
-        "w": 8,
-        "x": 0,
-        "y": 5
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 1
       },
       "id": 5,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
-        "justifyMode": "auto",
+        "justifyMode": "center",
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -272,16 +290,21 @@
           "fields": "",
           "values": false
         },
-        "textMode": "value_and_name"
+        "textMode": "auto"
       },
-      "pluginVersion": "11.2.2",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
-          "expr": "drift_token_distribution_jsd",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "time() - drift_metrics_last_update_timestamp{run_id=~\"$run_id\",phase=~\"$phase\"}",
+          "legendFormat": "seconds",
           "refId": "A"
         }
       ],
-      "title": "Token Distribution JSD",
+      "title": "Metrics File Freshness",
       "type": "stat"
     },
     {
@@ -289,23 +312,34 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "Traffic scenario is a demo label for the replayed window. In production this would usually be time, segment, region, tenant, or another traffic slice.",
       "fieldConfig": {
         "defaults": {
-          "decimals": 4
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 7,
+        "h": 4,
         "w": 8,
-        "x": 8,
-        "y": 5
+        "x": 16,
+        "y": 1
       },
       "id": 6,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
+        "graphMode": "none",
+        "justifyMode": "center",
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
@@ -314,41 +348,80 @@
           "fields": "",
           "values": false
         },
-        "textMode": "value_and_name"
+        "textMode": "name"
       },
-      "pluginVersion": "11.2.2",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
-          "expr": "drift_target_distribution_jsd",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "drift_window_status_code{source=\"latest\",run_id=~\"$run_id\",phase=~\"$phase\"}",
+          "legendFormat": "{{phase}}",
           "refId": "A"
         }
       ],
-      "title": "Target Distribution JSD",
+      "title": "Current Traffic Scenario",
       "type": "stat"
     },
     {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "decimals": 4
-        },
-        "overrides": []
-      },
+      "collapsed": false,
       "gridPos": {
-        "h": 7,
-        "w": 8,
-        "x": 16,
+        "h": 1,
+        "w": 24,
+        "x": 0,
         "y": 5
       },
-      "id": 7,
+      "id": 10,
+      "panels": [],
+      "title": "2. Request Stream: No Labels Required",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Incoming text distribution drift. This is available immediately after requests arrive.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 4,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.1
+              },
+              {
+                "color": "red",
+                "value": 0.2
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 6
+      },
+      "id": 11,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
+        "displayMode": "gradient",
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -356,41 +429,508 @@
           "fields": "",
           "values": false
         },
-        "textMode": "value_and_name"
+        "showUnfilled": true,
+        "valueMode": "color"
       },
-      "pluginVersion": "11.2.2",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
-          "expr": "drift_model_expert_disagreement_rate",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "drift_window_token_distribution_jsd{run_id=~\"$run_id\",phase=~\"$phase\"}",
+          "legendFormat": "w{{window_index}} {{phase}}",
           "refId": "A"
         }
       ],
-      "title": "Model-Expert Disagreement",
-      "type": "stat"
+      "title": "Token Distribution Drift by Window",
+      "type": "bargauge"
     },
     {
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "Distribution drift of production model predictions before expert labels arrive.",
       "fieldConfig": {
         "defaults": {
-          "decimals": 4
+          "decimals": 4,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.1
+              },
+              {
+                "color": "red",
+                "value": 0.2
+              }
+            ]
+          }
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 7,
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 6
+      },
+      "id": 12,
+      "options": {
+        "displayMode": "gradient",
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "pluginVersion": "10.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "drift_window_model_prediction_distribution_jsd{run_id=~\"$run_id\",phase=~\"$phase\"}",
+          "legendFormat": "w{{window_index}} {{phase}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Model Prediction Distribution Drift by Window",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Replay of the current model confidence as the demo service stream advances.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 3,
+          "mappings": [],
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.6
+              },
+              {
+                "color": "green",
+                "value": 0.8
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 6
+      },
+      "id": 13,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "drift_model_confidence_mean{run_id=~\"$run_id\",phase=~\"$phase\"}",
+          "legendFormat": "model confidence",
+          "refId": "A"
+        }
+      ],
+      "title": "Live Model Confidence Mean",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
+      "id": 20,
+      "panels": [],
+      "title": "3. Expert Feedback Arrived",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Expert label distribution drift. This is post-label: it appears only after delayed expert feedback arrives.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 4,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.1
+              },
+              {
+                "color": "red",
+                "value": 0.2
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 15
+      },
+      "id": 21,
+      "options": {
+        "displayMode": "gradient",
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "pluginVersion": "10.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "drift_window_target_distribution_jsd{run_id=~\"$run_id\",phase=~\"$phase\"}",
+          "legendFormat": "w{{window_index}} {{phase}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Expert Label Distribution Drift by Window",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "How often the production model disagrees with expert feedback.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 3,
+          "mappings": [],
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.2
+              },
+              {
+                "color": "red",
+                "value": 0.4
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 15
+      },
+      "id": 22,
+      "options": {
+        "displayMode": "gradient",
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "pluginVersion": "10.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "drift_window_model_expert_disagreement_rate{run_id=~\"$run_id\",phase=~\"$phase\"}",
+          "legendFormat": "w{{window_index}} {{phase}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Model-Expert Disagreement by Window",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Macro F1 between model predictions and expert labels. Lower is worse.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 3,
+          "mappings": [],
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.5
+              },
+              {
+                "color": "green",
+                "value": 0.7
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 15
+      },
+      "id": 23,
+      "options": {
+        "displayMode": "gradient",
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "pluginVersion": "10.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "drift_window_model_expert_macro_f1{run_id=~\"$run_id\",phase=~\"$phase\"}",
+          "legendFormat": "w{{window_index}} {{phase}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Model-Expert Macro F1 by Window",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Expert confidence is displayed as feedback signal quality. It is not used by this dashboard as a retraining weight.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 3,
+          "mappings": [],
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.6
+              },
+              {
+                "color": "green",
+                "value": 0.8
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 15
+      },
+      "id": 24,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "drift_expert_confidence_mean{run_id=~\"$run_id\",phase=~\"$phase\"}",
+          "legendFormat": "expert confidence",
+          "refId": "A"
+        }
+      ],
+      "title": "Live Expert Confidence Mean",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
+      "id": 30,
+      "panels": [],
+      "title": "4. Semantic Drift After Labels",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Checks whether token-to-label associations changed after expert labels are available.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 4,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
         "w": 12,
         "x": 0,
-        "y": 12
+        "y": 24
       },
-      "id": 8,
+      "id": 31,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
+        "displayMode": "gradient",
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -398,41 +938,94 @@
           "fields": "",
           "values": false
         },
-        "textMode": "value_and_name"
+        "showUnfilled": true,
+        "valueMode": "color"
       },
-      "pluginVersion": "11.2.2",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
-          "expr": "drift_model_expert_macro_f1",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "drift_window_token_label_association_drift{run_id=~\"$run_id\",phase=~\"$phase\"}",
+          "legendFormat": "w{{window_index}} {{phase}}",
           "refId": "A"
         }
       ],
-      "title": "Model-Expert Macro F1",
-      "type": "stat"
+      "title": "Token-Label Association Drift by Window",
+      "type": "bargauge"
     },
     {
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "Per-window status for the deeper association metric. 3 means not enough expert-labeled examples in the window.",
       "fieldConfig": {
         "defaults": {
-          "decimals": 4
+          "decimals": 0,
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "ok"
+                },
+                "1": {
+                  "color": "yellow",
+                  "index": 1,
+                  "text": "warning"
+                },
+                "2": {
+                  "color": "red",
+                  "index": 2,
+                  "text": "critical"
+                },
+                "3": {
+                  "color": "blue",
+                  "index": 3,
+                  "text": "insufficient"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          }
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 7,
+        "h": 8,
         "w": 12,
         "x": 12,
-        "y": 12
+        "y": 24
       },
-      "id": 9,
+      "id": 32,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
+        "displayMode": "gradient",
+        "maxVizHeight": 300,
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -440,38 +1033,271 @@
           "fields": "",
           "values": false
         },
-        "textMode": "value_and_name"
+        "showUnfilled": true,
+        "valueMode": "color"
       },
-      "pluginVersion": "11.2.2",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
-          "expr": "drift_token_label_association_drift",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "drift_window_metric_status_code{metric=\"token_label_association_drift\",run_id=~\"$run_id\",phase=~\"$phase\"}",
+          "legendFormat": "w{{window_index}} {{phase}}",
           "refId": "A"
         }
       ],
-      "title": "Token-Label Association Drift",
-      "type": "stat"
+      "title": "Token-Label Association Status",
+      "type": "bargauge"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "id": 40,
+      "panels": [],
+      "title": "5. Window Timeline",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Compact status line by replay window and traffic scenario.",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "ok"
+                },
+                "1": {
+                  "color": "yellow",
+                  "index": 1,
+                  "text": "warning"
+                },
+                "2": {
+                  "color": "red",
+                  "index": 2,
+                  "text": "critical"
+                },
+                "3": {
+                  "color": "blue",
+                  "index": 3,
+                  "text": "insufficient"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 33
+      },
+      "id": 41,
+      "options": {
+        "displayMode": "gradient",
+        "maxVizHeight": 300,
+        "minVizHeight": 12,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "pluginVersion": "10.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "drift_window_status_code{source=\"history\",run_id=~\"$run_id\",phase=~\"$phase\"}",
+          "legendFormat": "w{{window_index}} {{phase}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Overall Window Status Timeline",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Raw metric status table. Use it to see exactly which metric fired in each window.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
+      "id": 42,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "10.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "drift_window_metric_status_code{run_id=~\"$run_id\",phase=~\"$phase\"}",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "__auto",
+          "refId": "A"
+        }
+      ],
+      "title": "Window Metric Status Table",
+      "type": "table"
     }
   ],
   "refresh": "15s",
   "schemaVersion": 39,
-  "style": "dark",
   "tags": [
     "drift",
-    "synthetic",
-    "monitoring"
+    "monitoring",
+    "production-like"
   ],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": ".*",
+          "value": ".*"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(drift_window_info, run_id)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Run ID",
+        "multi": false,
+        "name": "run_id",
+        "options": [],
+        "query": {
+          "query": "label_values(drift_window_info, run_id)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(drift_window_info{run_id=~\"$run_id\"}, phase)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Traffic Scenario",
+        "multi": false,
+        "name": "phase",
+        "options": [],
+        "query": {
+          "query": "label_values(drift_window_info{run_id=~\"$run_id\"}, phase)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
   },
   "time": {
-    "from": "now-24h",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Synthetic Drift Monitoring",
-  "uid": "synthetic-drift-monitoring",
+  "title": "Production-like Drift Monitoring",
+  "uid": "drift-production-monitoring",
   "version": 1,
   "weekStart": ""
 }

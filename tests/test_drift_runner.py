@@ -1,11 +1,13 @@
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from drift.runner.cli import run_drift_monitoring
 from drift.runner.config import load_runner_config
 from drift.runner.metrics import (
     classify_window_status,
+    compute_pre_label_window_metrics,
     compute_thresholds,
     compute_window_metrics,
 )
@@ -203,6 +205,8 @@ def test_compute_window_metrics_and_status():
                 "Depression",
                 "Depression",
             ],
+            "model_confidence": [0.92, 0.61, 0.84, 0.81, 0.9, 0.88],
+            "expert_confidence": [0.97, 0.94, 0.91, 0.9, 0.89, 0.93],
         }
     )
     reference_stats = {
@@ -235,9 +239,55 @@ def test_compute_window_metrics_and_status():
     )
     status = classify_window_status(metrics, thresholds)
     assert "token_distribution_jsd" in metrics
+    assert "model_prediction_distribution_jsd" in metrics
+    assert metrics["model_confidence_mean"] == pd.Series(
+        [0.92, 0.61, 0.84, 0.81, 0.9, 0.88]
+    ).mean()
     assert "target_distribution_jsd" in metrics
+    assert metrics["expert_confidence_mean"] == pd.Series(
+        [0.97, 0.94, 0.91, 0.9, 0.89, 0.93]
+    ).mean()
     assert "overall_status" in status
     assert thresholds["metrics"]["model_expert_macro_f1"]["direction"] == "lower_is_worse"
+
+
+def test_pre_label_window_metrics_do_not_require_expert_labels():
+    window_df = pd.DataFrame(
+        {
+            "tokens_stemmed": [
+                "anxious restless",
+                "work pressure",
+                "empty hopeless",
+            ],
+            "model_prediction": ["Anxiety", "Stress", "Depression"],
+            "model_confidence": [0.9, 0.7, 0.8],
+        }
+    )
+    reference_stats = {
+        "class_distribution": {
+            "Anxiety": 0.34,
+            "Depression": 0.33,
+            "Stress": 0.33,
+        },
+        "top_tokens": [
+            {"token": "anxious", "count": 10},
+            {"token": "work", "count": 10},
+            {"token": "empty", "count": 10},
+        ],
+    }
+
+    metrics = compute_pre_label_window_metrics(
+        window_df,
+        reference_stats=reference_stats,
+        top_k_tokens=3,
+    )
+
+    assert set(metrics) == {
+        "token_distribution_jsd",
+        "model_prediction_distribution_jsd",
+        "model_confidence_mean",
+    }
+    assert metrics["model_confidence_mean"] == pytest.approx(0.8)
 
 
 def test_thresholds_use_lower_tail_for_macro_f1():
@@ -252,6 +302,7 @@ def test_thresholds_use_lower_tail_for_macro_f1():
         window.update(
             {
                 "token_distribution_jsd": 0.1,
+                "model_prediction_distribution_jsd": 0.1,
                 "target_distribution_jsd": 0.1,
                 "model_expert_disagreement_rate": 0.1,
                 "token_label_association_drift": 0.1,
@@ -271,6 +322,7 @@ def test_thresholds_use_lower_tail_for_macro_f1():
         {
             "model_expert_macro_f1": 0.85,
             "token_distribution_jsd": 0.1,
+            "model_prediction_distribution_jsd": 0.1,
             "target_distribution_jsd": 0.1,
             "model_expert_disagreement_rate": 0.1,
             "token_label_association_drift": 0.1,
@@ -294,9 +346,12 @@ def test_prom_metrics_payload():
         mode="debug",
         latest_window={
             "token_distribution_jsd": 0.1,
+            "model_prediction_distribution_jsd": 0.12,
+            "model_confidence_mean": 0.82,
             "target_distribution_jsd": 0.2,
             "model_expert_disagreement_rate": 0.3,
             "model_expert_macro_f1": 0.7,
+            "expert_confidence_mean": 0.91,
             "token_label_association_drift": 0.4,
             "overall_status": "warning",
             "phase": "B_lexical",
@@ -305,6 +360,9 @@ def test_prom_metrics_payload():
         },
     )
     assert payload["drift_runner_mode"] == "debug"
+    assert payload["drift_model_prediction_distribution_jsd"] == 0.12
+    assert payload["drift_model_confidence_mean"] == 0.82
+    assert payload["drift_expert_confidence_mean"] == 0.91
     assert payload["drift_window_status_code"] == 1
 
 

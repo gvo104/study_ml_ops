@@ -27,11 +27,16 @@ def build_prom_metrics_latest(
         "run_id": run_id,
         "drift_runner_mode": mode,
         "drift_token_distribution_jsd": latest_window.get("token_distribution_jsd"),
+        "drift_model_prediction_distribution_jsd": latest_window.get(
+            "model_prediction_distribution_jsd"
+        ),
+        "drift_model_confidence_mean": latest_window.get("model_confidence_mean"),
         "drift_target_distribution_jsd": latest_window.get("target_distribution_jsd"),
         "drift_model_expert_disagreement_rate": latest_window.get(
             "model_expert_disagreement_rate"
         ),
         "drift_model_expert_macro_f1": latest_window.get("model_expert_macro_f1"),
+        "drift_expert_confidence_mean": latest_window.get("expert_confidence_mean"),
         "drift_token_label_association_drift": latest_window.get(
             "token_label_association_drift"
         ),

@@ -13,6 +13,7 @@ from src.config import TARGET_COLUMN, TEXT_COLUMN
 
 METRIC_DIRECTIONS = {
     "token_distribution_jsd": "higher_is_worse",
+    "model_prediction_distribution_jsd": "higher_is_worse",
     "target_distribution_jsd": "higher_is_worse",
     "model_expert_disagreement_rate": "higher_is_worse",
     "model_expert_macro_f1": "lower_is_worse",
@@ -27,19 +28,25 @@ def compute_window_metrics(
     min_examples_per_class: int,
     min_classes: int,
 ) -> dict[str, Any]:
-    metrics = {
-        "token_distribution_jsd": compute_token_distribution_jsd(
-            window_df,
-            reference_stats,
-            top_k_tokens=top_k_tokens,
-        ),
-        "target_distribution_jsd": compute_target_distribution_jsd(
-            window_df,
-            reference_stats["class_distribution"],
-        ),
-        "model_expert_disagreement_rate": compute_disagreement_rate(window_df),
-        "model_expert_macro_f1": compute_macro_f1(window_df),
-    }
+    metrics = compute_pre_label_window_metrics(
+        window_df,
+        reference_stats=reference_stats,
+        top_k_tokens=top_k_tokens,
+    )
+    metrics.update(
+        {
+            "target_distribution_jsd": compute_target_distribution_jsd(
+                window_df,
+                reference_stats["class_distribution"],
+            ),
+            "expert_confidence_mean": compute_mean_numeric(
+                window_df,
+                "expert_confidence",
+            ),
+            "model_expert_disagreement_rate": compute_disagreement_rate(window_df),
+            "model_expert_macro_f1": compute_macro_f1(window_df),
+        }
+    )
 
     association = compute_token_label_association_drift(
         window_df,
@@ -49,6 +56,25 @@ def compute_window_metrics(
     )
     metrics.update(association)
     return metrics
+
+
+def compute_pre_label_window_metrics(
+    window_df: pd.DataFrame,
+    reference_stats: dict[str, Any],
+    top_k_tokens: int,
+) -> dict[str, Any]:
+    return {
+        "token_distribution_jsd": compute_token_distribution_jsd(
+            window_df,
+            reference_stats,
+            top_k_tokens=top_k_tokens,
+        ),
+        "model_prediction_distribution_jsd": compute_model_prediction_distribution_jsd(
+            window_df,
+            reference_stats["class_distribution"],
+        ),
+        "model_confidence_mean": compute_mean_numeric(window_df, "model_confidence"),
+    }
 
 
 def compute_token_distribution_jsd(
@@ -76,13 +102,51 @@ def compute_target_distribution_jsd(
     df: pd.DataFrame,
     reference_distribution: dict[str, float],
 ) -> float:
-    labels = sorted(reference_distribution)
-    current_distribution = (
-        df["expert_label"].value_counts(normalize=True).reindex(labels, fill_value=0.0)
+    return compute_label_distribution_jsd(
+        df,
+        label_column="expert_label",
+        reference_distribution=reference_distribution,
     )
+
+
+def compute_model_prediction_distribution_jsd(
+    df: pd.DataFrame,
+    reference_distribution: dict[str, float],
+) -> float:
+    return compute_label_distribution_jsd(
+        df,
+        label_column="model_prediction",
+        reference_distribution=reference_distribution,
+    )
+
+
+def compute_label_distribution_jsd(
+    df: pd.DataFrame,
+    label_column: str,
+    reference_distribution: dict[str, float],
+) -> float:
+    labels = sorted(reference_distribution)
+    if df.empty or label_column not in df:
+        current_distribution = pd.Series(0.0, index=labels)
+    else:
+        current_distribution = (
+            df[label_column]
+            .value_counts(normalize=True)
+            .reindex(labels, fill_value=0.0)
+        )
+        current_distribution = current_distribution.reindex(labels, fill_value=0.0)
     ref_vector = np.array([reference_distribution[label] for label in labels], dtype=float)
     cur_vector = current_distribution.to_numpy(dtype=float)
     return float(jensenshannon(ref_vector, cur_vector, base=2.0) ** 2)
+
+
+def compute_mean_numeric(df: pd.DataFrame, column: str) -> float | None:
+    if df.empty or column not in df:
+        return None
+    values = pd.to_numeric(df[column], errors="coerce").dropna()
+    if values.empty:
+        return None
+    return float(values.mean())
 
 
 def compute_disagreement_rate(df: pd.DataFrame) -> float:

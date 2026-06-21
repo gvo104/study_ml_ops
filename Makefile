@@ -224,7 +224,7 @@ infra-logs:
 
 ## Start Prometheus + Grafana + drift exporter
 monitoring-up:
-	docker compose -f docker-compose.monitoring.yml up -d
+	docker compose -f docker-compose.monitoring.yml up -d --build --force-recreate
 
 ## Stop Prometheus + Grafana + drift exporter
 monitoring-down:

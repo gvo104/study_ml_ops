@@ -7,6 +7,10 @@ services:
     restart: unless-stopped
     ports:
       - "9108:9108"
+    environment:
+      DRIFT_REPLAY_ENABLED: "true"
+      DRIFT_REPLAY_STEP_SECONDS: "15"
+      DRIFT_REPLAY_LOOP: "true"
     volumes:
       - ./drift/artifacts/runs:/app/drift/artifacts/runs:ro
 
