@@ -1,6 +1,9 @@
 from contextlib import asynccontextmanager
+from functools import lru_cache
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse
 
 from drift.synthetic_api.config import SyntheticApiSettings, load_settings
 from drift.synthetic_api.runtimes import (
@@ -8,6 +11,14 @@ from drift.synthetic_api.runtimes import (
     build_runtime,
 )
 from drift.synthetic_api.schemas import HealthResponse, RunRequest, RunResponse
+
+
+FRONTEND_PATH = Path(__file__).resolve().parent / "frontend" / "index.html"
+
+
+@lru_cache(maxsize=1)
+def _load_frontend() -> str:
+    return FRONTEND_PATH.read_text(encoding="utf-8")
 
 
 def create_app(settings: SyntheticApiSettings | None = None) -> FastAPI:
@@ -21,6 +32,9 @@ def create_app(settings: SyntheticApiSettings | None = None) -> FastAPI:
             model_path=app_settings.model_path,
             temperature=app_settings.temperature,
             max_retries=app_settings.max_retries,
+            max_tokens=app_settings.max_tokens,
+            context_window=app_settings.context_window,
+            gpu_layers=app_settings.gpu_layers,
         )
         yield
         app.state.runtime = None
@@ -30,6 +44,10 @@ def create_app(settings: SyntheticApiSettings | None = None) -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
     )
+
+    @app.get("/", response_class=HTMLResponse)
+    async def index():
+        return HTMLResponse(_load_frontend())
 
     @app.get("/health", response_model=HealthResponse)
     async def health(request: Request):

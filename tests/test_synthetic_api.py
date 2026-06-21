@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 
 import pytest
 
@@ -10,7 +11,13 @@ from httpx import ASGITransport, AsyncClient
 from drift.synthetic_api.app import create_app
 from drift.synthetic_api.config import SyntheticApiSettings
 from drift.synthetic_api.schemas import GeneratorRequest
-from drift.synthetic_api.runtimes import MockLlmRuntime, SerializedRuntime
+from drift.synthetic_api.runtimes import (
+    LlamaCppRuntime,
+    MockLlmRuntime,
+    RuntimeErrorWithContext,
+    SerializedRuntime,
+    build_runtime,
+)
 
 
 @pytest.fixture
@@ -28,6 +35,20 @@ async def test_synthetic_health_endpoint(app):
             response = await client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "backend": "mock", "loaded": True}
+
+
+@pytest.mark.anyio
+async def test_synthetic_frontend_is_served(app):
+    async with app.router.lifespan_context(app):
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            response = await client.get("/")
+    assert response.status_code == 200
+    assert "Synthetic API Console" in response.text
+    assert "Run Generator" in response.text
+    assert "Run Expert" in response.text
 
 
 @pytest.mark.anyio
@@ -137,3 +158,79 @@ def test_serialized_runtime_prevents_parallel_execution():
     asyncio.run(run_twice())
     assert runtime.call_count == 2
     assert runtime.max_concurrency == 1
+
+
+def test_build_runtime_rejects_unknown_backend():
+    with pytest.raises(RuntimeErrorWithContext):
+        build_runtime(
+            backend="unknown",
+            model_path=Path("unused.gguf"),
+            temperature=0.3,
+            max_retries=2,
+        )
+
+
+def test_llama_cpp_runtime_requires_existing_model_file():
+    with pytest.raises(RuntimeErrorWithContext, match="GGUF model not found"):
+        build_runtime(
+            backend="llama_cpp",
+            model_path=Path("missing.gguf"),
+            temperature=0.3,
+            max_retries=2,
+        )
+
+
+def test_llama_cpp_generator_response_is_canonicalized():
+    runtime = object.__new__(LlamaCppRuntime)
+    payload = GeneratorRequest(
+        role="generator",
+        phase="A",
+        target_label="Anxiety",
+        constraints={"length": "short"},
+    )
+
+    response = runtime._build_generator_response(
+        payload,
+        {
+            "role": "patient",
+            "text": "I feel anxious and restless.",
+            "target_label": "Other",
+            "phase": "Z",
+        },
+    )
+
+    assert response.role == "generator"
+    assert response.target_label == "Anxiety"
+    assert response.phase == "A"
+
+
+def test_llama_cpp_expert_response_is_canonicalized():
+    runtime = object.__new__(LlamaCppRuntime)
+
+    response = runtime._build_expert_response(
+        {
+            "role": "labeler",
+            "label": "Stress",
+            "confidence": 0.82,
+            "reason": "Work-related overload.",
+        }
+    )
+
+    assert response.role == "expert"
+    assert response.label == "Stress"
+
+
+def test_llama_cpp_expert_confidence_percent_is_normalized():
+    runtime = object.__new__(LlamaCppRuntime)
+
+    response = runtime._build_expert_response(
+        {
+            "role": "labeler",
+            "label": "Anxiety",
+            "confidence": 95,
+            "reason": "Clear anxiety symptoms.",
+        }
+    )
+
+    assert response.role == "expert"
+    assert response.confidence == 0.95
