@@ -5,12 +5,16 @@ Allowed labels: {allowed_labels}
 Status guide:
 {status_guide}
 
+Boundary guide:
+{boundary_guide}
+
 Patient text:
 {text}
 
 Requirements:
 - Choose exactly one label from the allowed labels.
 - Base the decision only on the patient text.
+- If the text contains clear distress, risk, panic, burnout, or hopelessness, do not choose Normal.
 - Confidence must be a number from 0 to 1.
 - Reason must be short and concrete.
 - Return keys exactly: role, label, confidence, reason.

@@ -11,9 +11,14 @@ Phase guide:
 Status guide:
 {status_guide}
 
+Label boundary guide:
+{boundary_guide}
+
 Requirements:
 - Write only the patient message text, not advice and not a diagnosis.
 - Match the target label clearly but naturally.
+- Include 2-4 clear anchors for the target label.
+- Avoid phrases that point more strongly to another label.
 - Keep the wording realistic and short enough for ordinary user input.
 - Return keys exactly: role, text, target_label, phase.
 - Use role="generator", target_label="{target_label}", phase="{phase}".
