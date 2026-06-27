@@ -1,75 +1,63 @@
-# План организации LLM-синтезатора и LLM-эксперта в отдельном API
+# Synthetic API: generator and expert
 
-## Кратко
-Использовать **одну** локально загруженную модель `Qwen2.5-3B-Instruct` в формате `GGUF` через `llama.cpp`, но запускать её в **отдельном FastAPI-приложении `synthetic-api`**. Модель загружается один раз при старте `synthetic-api` и дальше обслуживает две роли через **один endpoint с параметром `role`**:
-- `generator` — синтезирует обращение
-- `expert` — оценивает уже готовое обращение
+## Current Role
 
-Важно: это **не две отдельные LLM** и не две копии модели в памяти.
-Это **одна и та же модель**, которая работает в двух режимах за счет разных системных промптов.
+`synthetic-api` - отдельный FastAPI сервис для LLM-based synthetic traffic.
 
-Все обращения к модели выполняются **строго последовательно**, без параллельного инференса. Это главный механизм адаптации под `RTX 3060 12GB`: одна LLM в памяти, один `synthetic-api` процесс, одна очередь исполнения.
+Он обслуживает один endpoint:
 
-Основное FastAPI-приложение с `/predict` остается отдельным `predict-api` и не загружает LLM.
+```text
+POST /llm/run
+```
 
-## Архитектура и смысл решений
-- `llama.cpp + GGUF`
-  Это движок для локального запуска LLM в лёгком формате.
-  Смысл: минимизировать расход VRAM/RAM и не тащить тяжёлый `transformers`-стек ради одной 3B-модели.
-- `One endpoint + role`
-  Один HTTP endpoint обслуживает обе роли.
-  Смысл: не плодить два почти одинаковых сервиса, если отличается только системный промпт и схема ответа.
-- `Separate synthetic API`
-  LLM-компонент живёт в отдельном FastAPI-приложении `synthetic-api`.
-  Смысл: изолировать тяжёлый LLM-runtime, таймауты, очередь и ошибки от основного `predict-api`, но сохранить простой локальный запуск на одной машине.
-  Сам orchestration drift-сценариев выполняется **внешним оффлайн-runner'ом**, а не внутри `predict-api` или `synthetic-api`.
-- `Strictly sequential`
-  Все вызовы к Qwen проходят по одному.
-  Смысл: исключить конкуренцию за GPU/память и не ловить нестабильность на одной видеокарте.
+Роли:
 
-## Основные изменения и интерфейсы
-- Добавить singleton-компонент `LlmRuntime`, который:
-  - загружает `Qwen2.5-3B-Instruct GGUF` при старте `synthetic-api`
-  - хранит один инстанс `llama.cpp`
-  - предоставляет метод `run(role, payload)`
-  - защищён `asyncio.Lock` или эквивалентным mutex, чтобы гарантировать строго последовательный доступ
-- Добавить в `synthetic-api` один endpoint, например `POST /llm/run`, с обязательным полем `role`
-- Оставить основной `predict-api` без зависимости от `LlmRuntime`; он продолжает обслуживать `/predict` и `/health`
+- `generator`: генерирует текст пользовательского обращения по phase и hidden target label;
+- `expert`: размечает готовый текст, не получая phase, target label или synthetic metadata.
 
-- Зафиксировать границы ответственности:
-  - `predict-api` только выполняет inference текущей production-модели классификации
-  - `synthetic-api + LlmRuntime` только выполняют LLM-инференс по двум ролям
-  - внешний `drift-runner` вызывает `synthetic-api`, собирает synthetic stream, прогоняет preprocessing, вызывает `predict-api` и считает drift-метрики
-  - основной endpoint модели `/predict` не должен зависеть от запуска `synthetic-api` или synthetic drift-контура
+Основной `predict-api` не загружает LLM и не зависит от `synthetic-api`.
 
-Запрос для `generator`:
+## Runtime
+
+В production-like локальном режиме ожидается одна локальная модель `Qwen2.5-3B-Instruct GGUF` через `llama.cpp`.
+
+Вызовы сериализуются через lock, чтобы на одной машине не было параллельного LLM inference.
+
+Для tests/dev есть `MockLlmRuntime`, который повторяет контракт без загрузки модели.
+
+## Generator Contract
+
+Request:
+
 ```json
 {
   "role": "generator",
   "phase": "A|B|C|D",
   "target_label": "Anxiety|Bipolar|Depression|Normal|Personality disorder|Stress|Suicidal",
   "constraints": {
-    "style": "optional",
+    "style": "neutral",
     "length": "short|medium|long"
   }
 }
 ```
 
-Ответ для `generator`:
+Response:
+
 ```json
 {
   "role": "generator",
   "text": "generated patient message",
-  "target_label": "Anxiety",
+  "target_label": "Stress",
   "phase": "B"
 }
 ```
 
-Примечание:
-- `target_label` и `phase` нужны только orchestration-слою synthetic сценария
-- они не являются предсказанием модели-классификатора и не должны попадать во вход `expert`
+`phase` и `target_label` являются orchestration metadata. Они не передаются в expert request и не экспортируются как monitoring signal.
 
-Запрос для `expert`:
+## Expert Contract
+
+Request:
+
 ```json
 {
   "role": "expert",
@@ -86,75 +74,59 @@
 }
 ```
 
-Ответ для `expert`:
+Response:
+
 ```json
 {
   "role": "expert",
   "label": "Stress",
   "confidence": 0.82,
-  "reason": "short explanation"
+  "reason": "short concrete reason"
 }
 ```
 
-- Для обеих ролей использовать **разные системные промпты**, но один и тот же runtime.
-- Ответы модели требовать в **строгом JSON-формате**.
-- После генерации выполнять валидацию JSON и при невалидном ответе делать ограниченное число повторов с более жёстким repair-prompt.
+Expert считается proxy truth для demo monitoring. Reject/regenerate больше не является runtime-механизмом нового pipeline.
 
-## Логика работы ролей
-- `generator`
-  Получает фазу drift-сценария и целевой класс.
-  Должен вернуть только текст обращения и служебные поля сценария.
-  Он не должен пытаться анализировать качество модели или подменять роль эксперта.
-- `expert`
-  Получает только текст обращения и фиксированный список допустимых классов.
-  Не получает `target_label`, фазу сценария или подсказки о правильном ответе.
-  Это нужно, чтобы роль эксперта была максимально независимой.
-- Оркестрация synthetic sample:
-  1. вызвать `generator`
-  2. передать сгенерированный текст в `expert`
-  3. если `expert.label != generator.target_label`, отбросить sample или перегенерировать
-  4. если совпало, sample допускается в synthetic stream
-  5. допущенный sample обязательно прогнать через production preprocessing pipeline и только после этого использовать в drift-метриках
+Если expert системно ошибается, чинить нужно prompt/boundary guide или replay cache, а не скрыто отбрасывать события в monitoring flow.
 
-## Промпт-дизайн
-- Системный промпт `generator`
-  Жёстко задаёт роль “пациент/пользователь”, запрещает давать label в тексте ответа, требует генерировать только реалистичное обращение под указанный класс и фазу drift.
-- Системный промпт `expert`
-  Жёстко задаёт роль “клиницист/эксперт-разметчик”, требует выбрать **ровно один** класс из фиксированного списка, вернуть короткую причину и confidence от `0` до `1`.
-- Для обеих ролей:
-  - temperature умеренная
-  - ограничение на длину ответа
-  - JSON-only output
-  - запрещены markdown, свободные пояснения и текст вне JSON
+## Phase Prompting
 
-- Для `expert` отдельно зафиксировать:
-  - во вход нельзя передавать `target_label`
-  - во вход нельзя передавать `phase`
-  - во вход нельзя передавать внутренние synthetic-метаданные
-  - эксперт должен принимать решение только по тексту обращения и списку допустимых классов
+Phase guide живет в:
 
-## Проверки
-- При старте `synthetic-api` модель должна грузиться один раз и быть доступной обеим ролям без повторной инициализации.
-- При старте `predict-api` LLM не должна загружаться.
-- Параллельные запросы к `/llm/run` в `synthetic-api` должны фактически сериализоваться, а не исполняться одновременно.
-- `generator` должен стабильно возвращать валидный JSON с `text`, `target_label`, `phase`.
-- `expert` должен стабильно возвращать валидный JSON с `label`, `confidence`, `reason`.
-- `expert` никогда не должен видеть `target_label` во входе.
-- На пачке synthetic примеров должно быть видно, что reject/regenerate-механизм фильтрует неудачные samples.
-- При таймауте или невалидном JSON сервис должен возвращать структурированную ошибку, не ломая весь API-процесс.
-- В accepted synthetic sample после preprocessing должны появляться:
-  - `tokens_stemmed`
-  - `num_of_characters`
-  - `num_of_sentences`
+```text
+drift/synthetic_api/prompt_templates/phase_definitions.txt
+```
 
-  Это обязательно, потому что downstream drift-метрики работают не только по raw text, но и по тем же признакам, что использовались при обучении модели.
+Текущий смысл фаз:
 
-## Допущения
-- Локальная машина ограничена одной `RTX 3060 12GB`, поэтому две отдельные одновременно загруженные модели не используются.
-- `Qwen2.5-3B-Instruct GGUF` считается достаточно лёгкой моделью для `GGUF/llama.cpp`-сценария.
-- Для v1 throughput не критичен; приоритет — стабильность, воспроизводимость, изоляция LLM от `predict-api` и простота локального запуска.
-- Внешний `drift-runner` будет вызывать endpoint `synthetic-api`, а не пытаться держать собственную копию модели.
-- Один и тот же accepted synthetic sample затем используется:
-  - как вход в production-классификатор
-  - как вход в drift-пайплайн
-  - как единица сравнения с `expert label`
+- `A`: baseline-like wording;
+- `B`: lexical/style shift при той же семантике;
+- `C`: baseline-like wording, distribution shift создается orchestrator;
+- `D`: context-based token-label association shift.
+
+Для `D` expert prompt явно требует интерпретировать marker words через контекст, а не как single keyword.
+
+## Current Orchestration
+
+Основной orchestrator:
+
+```text
+drift.demo.phase_worker
+```
+
+Flow:
+
+```text
+generator -> predict-api -> expert -> SQLite
+```
+
+После генерации текст обязательно проходит production preprocessing через `drift.runner.pipeline.build_preprocessed_record`.
+
+## Required Checks
+
+- `generator` возвращает strict JSON с `role`, `text`, `target_label`, `phase`;
+- `expert` возвращает strict JSON с `role`, `label`, `confidence`, `reason`;
+- expert request не принимает `phase` и `target_label`;
+- `predict-api` не загружает LLM;
+- parallel requests к real LLM runtime сериализуются;
+- phase-specific prompt instructions покрыты tests.
