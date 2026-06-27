@@ -76,6 +76,29 @@ async def test_generator_response_contract(app):
 
 
 @pytest.mark.anyio
+async def test_generator_phase_d_uses_context_inversion(app):
+    async with app.router.lifespan_context(app):
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://testserver",
+        ) as client:
+            response = await client.post(
+                "/llm/run",
+                json={
+                    "role": "generator",
+                    "phase": "D",
+                    "target_label": "Depression",
+                    "constraints": {"length": "short"},
+                },
+            )
+    payload = response.json()
+    text_lower = payload["text"].lower()
+    assert response.status_code == 200
+    assert "fine" in text_lower
+    assert "numb" in text_lower
+
+
+@pytest.mark.anyio
 async def test_expert_response_contract(app):
     async with app.router.lifespan_context(app):
         async with AsyncClient(

@@ -28,6 +28,8 @@ def test_generator_prompt_is_composed_from_role_and_guides():
     assert "- Anxiety must include:" in user_prompt
     assert "- Anxiety must avoid:" in user_prompt
     assert 'target_label="Anxiety"' in user_prompt
+    assert "Primary expected drift marker: token_distribution_jsd" in user_prompt
+    assert "For phase D" in user_prompt
 
 
 def test_expert_prompt_contains_only_allowed_statuses():
@@ -49,3 +51,6 @@ def test_expert_prompt_contains_only_allowed_statuses():
     assert "Confidence must be a number from 0 to 1." in user_prompt
     assert 'do not choose "Normal"' in system_prompt
     assert "do not choose Normal" in user_prompt
+    assert "fine, calm, productive, and busy" in user_prompt
+    assert "Phase:" not in user_prompt
+    assert "target_label" not in user_prompt

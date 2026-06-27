@@ -1,4 +1,4 @@
-- A: close to baseline training language and tone.
-- B: same condition, but wording and vocabulary shift.
-- C: same language style, but class frequency is changing.
-- D: words partly overlap with baseline, but label associations drift.
+- A / A_baseline: baseline-like wording, common training-style words, clear class anchors, neutral tone, no slang, no semantic tricks.
+- B / B_lexical: keep the same clinical meaning and target-label distribution as baseline, but shift wording with synonyms, informal phrases, paraphrases, and less training-like vocabulary. Primary expected drift marker: token_distribution_jsd.
+- C / C_label_distribution: use baseline-like wording and normal anchors. Do not intentionally change vocabulary; the orchestrator creates the distribution shift by choosing target labels more often. Primary expected drift marker: target_distribution_jsd.
+- D / D_association: reuse familiar/common words in inverted or context-dependent meanings. The label must come from surrounding context, not the marker word alone. Examples: calm used while masking anxiety, productive used during elevated bipolar energy, fine used for depressive numbness, busy used for stress overload. Primary expected drift marker: token_label_association_drift.

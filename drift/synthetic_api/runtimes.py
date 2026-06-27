@@ -66,32 +66,55 @@ class MockLlmRuntime:
             self.active_calls -= 1
 
     def _generate_text(self, payload: GeneratorRequest) -> str:
-        templates = {
-            "Anxiety": "I feel anxious, restless, and my heart races at night.",
-            "Bipolar": "My mood swings fast and I barely sleep during highs.",
-            "Depression": "I feel empty, tired, and nothing seems worth doing.",
-            "Normal": "I had a regular day, slept well, and feel okay overall.",
-            "Personality disorder": "My relationships feel unstable and I react intensely.",
-            "Stress": "Work pressure is building up and I cannot relax lately.",
-            "Suicidal": "I keep thinking that life is pointless and I want to disappear.",
+        phase_templates = {
+            "A": {
+                "Anxiety": "I feel anxious, restless, and my heart races at night.",
+                "Bipolar": "My mood swings fast and I barely sleep during highs.",
+                "Depression": "I feel empty, tired, and nothing seems worth doing.",
+                "Normal": "I had a regular day, slept well, and feel okay overall.",
+                "Personality disorder": "My relationships feel unstable and I react intensely.",
+                "Stress": "Work pressure is building up and I cannot relax lately.",
+                "Suicidal": "I keep thinking that life is pointless and I want to disappear.",
+            },
+            "B": {
+                "Anxiety": "My nerves are buzzing, I keep spiraling, and nighttime feels tense.",
+                "Bipolar": "I am wired for days, talking fast, and sleep feels optional.",
+                "Depression": "Everything feels flat, heavy, and pointless even when nothing happened.",
+                "Normal": "Today was ordinary; I rested, handled errands, and felt steady.",
+                "Personality disorder": "Small shifts in closeness hit hard and I snap before I can slow down.",
+                "Stress": "Deadlines are stacking up, my shoulders stay tight, and I cannot switch off.",
+                "Suicidal": "I do not want to keep going and disappearing sounds like relief.",
+            },
+            "C": {
+                "Anxiety": "I feel anxious, restless, and my heart races at night.",
+                "Bipolar": "My mood swings fast and I barely sleep during highs.",
+                "Depression": "I feel empty, tired, and nothing seems worth doing.",
+                "Normal": "I had a regular day, slept well, and feel okay overall.",
+                "Personality disorder": "My relationships feel unstable and I react intensely.",
+                "Stress": "Work pressure is building up and I cannot relax lately.",
+                "Suicidal": "I keep thinking that life is pointless and I want to disappear.",
+            },
+            "D": {
+                "Anxiety": "I keep saying I am calm, but I scan every sound and my chest tightens.",
+                "Bipolar": "I call it productive, yet I have slept two hours and cannot slow my ideas.",
+                "Depression": "I tell people I am fine, but I feel numb and cannot care about anything.",
+                "Normal": "I stayed busy with normal errands, slept well, and felt balanced afterward.",
+                "Personality disorder": "I seem calm until a delayed reply makes me panic and lash out.",
+                "Stress": "I say I am just busy, but the overload is constant and I cannot relax.",
+                "Suicidal": "I tell everyone I am fine, but I keep imagining not being here anymore.",
+            },
         }
-        phase_suffix = {
-            "A": "The wording is close to typical training examples.",
-            "B": "I am using slightly different wording and slang than usual.",
-            "C": "People around me have similar complaints more often now.",
-            "D": "The same words seem to carry a different meaning lately.",
-        }
-        return f"{templates[payload.target_label]} {phase_suffix[payload.phase]}"
+        return phase_templates[payload.phase][payload.target_label]
 
     def _classify_text(self, payload: ExpertRequest) -> ExpertResponse:
         label_keywords = {
-            "Anxiety": ["anxious", "panic", "heart races", "restless"],
-            "Bipolar": ["mood swings", "highs", "barely sleep"],
-            "Depression": ["empty", "tired", "worth doing"],
-            "Normal": ["regular day", "slept well", "okay overall"],
-            "Personality disorder": ["unstable", "react intensely", "relationships"],
-            "Stress": ["work pressure", "cannot relax", "stress"],
-            "Suicidal": ["pointless", "disappear", "suicidal"],
+            "Anxiety": ["anxious", "panic", "heart races", "restless", "spiraling", "chest tightens", "scan every sound"],
+            "Bipolar": ["mood swings", "highs", "barely sleep", "sleep feels optional", "slept two hours", "cannot slow my ideas"],
+            "Depression": ["empty", "tired", "worth doing", "flat", "heavy", "numb", "cannot care"],
+            "Normal": ["regular day", "slept well", "okay overall", "felt steady", "felt balanced"],
+            "Personality disorder": ["unstable", "react intensely", "relationships", "snap", "lash out", "delayed reply"],
+            "Stress": ["work pressure", "cannot relax", "stress", "deadlines", "switch off", "overload"],
+            "Suicidal": ["pointless", "disappear", "suicidal", "not being here", "do not want to keep going"],
         }
         text_lower = payload.text.lower()
 

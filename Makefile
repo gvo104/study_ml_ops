@@ -1,4 +1,4 @@
-.PHONY: clean data environment lint requirements train predict test test-synthetic test-drift test-monitoring serve serve-synthetic serve-drift-exporter run-drift-debug run-drift-full experiments dvc-repro dvc-pull sync_data_to_s3 sync_data_from_s3 monitoring-up monitoring-down monitoring-status
+.PHONY: clean data environment lint requirements train predict test test-synthetic test-drift test-monitoring serve serve-synthetic serve-drift-exporter run-drift-debug run-drift-full run-replay-demo generate-phase-demo-data compute-demo-metrics run-online-traffic run-expert-batch export-training-candidates experiments dvc-repro dvc-pull sync_data_to_s3 sync_data_from_s3 monitoring-up monitoring-down monitoring-restart monitoring-status
 
 #################################################################################
 # GLOBALS                                                                       #
@@ -50,7 +50,7 @@ test:
 test-synthetic:
 	$(PYTHON_INTERPRETER) -m pytest tests/test_synthetic_api.py -q
 
-## Run only drift-runner tests
+## Run legacy/shared drift-runner tests
 test-drift:
 	$(PYTHON_INTERPRETER) -m pytest tests/test_drift_runner.py -q
 
@@ -70,13 +70,41 @@ serve-synthetic:
 serve-drift-exporter:
 	$(PYTHON_INTERPRETER) -m uvicorn drift.monitoring.app:app --reload --host $${DRIFT_EXPORTER_HOST:-0.0.0.0} --port $${DRIFT_EXPORTER_PORT:-9108}
 
-## Run drift-runner in debug mode
+## Run legacy batch drift-runner in debug mode
 run-drift-debug:
 	$(PYTHON_INTERPRETER) -m drift.runner.cli run --config drift/configs/runner.yaml --mode debug
 
-## Run drift-runner in full mode
+## Run legacy batch drift-runner in full mode
 run-drift-full:
 	$(PYTHON_INTERPRETER) -m drift.runner.cli run --config drift/configs/runner.yaml --mode full
+
+#################################################################################
+# DRIFT DEMO PIPELINE                                                           #
+#################################################################################
+
+## Replay pre-generated demo traffic into SQLite event store
+run-replay-demo:
+	$(PYTHON_INTERPRETER) -m drift.replay.worker --dataset $${DRIFT_REPLAY_DATASET:-drift/replay/messages.jsonl} --db-path $${DRIFT_EVENTS_DB:-drift/artifacts/demo/events.sqlite} --config drift/configs/runner.yaml --mode $${DRIFT_MODE:-debug} --interval-seconds $${DRIFT_REPLAY_INTERVAL_SECONDS:-1}
+
+## Generate phased LLM synthetic demo data and save replay cache
+generate-phase-demo-data:
+	$(PYTHON_INTERPRETER) -m drift.demo.phase_worker --db-path $${DRIFT_EVENTS_DB:-drift/artifacts/demo/events.sqlite} --config drift/configs/runner.yaml --mode $${DRIFT_MODE:-debug} --interval-seconds $${DRIFT_PHASE_INTERVAL_SECONDS:-0} --replay-output $${DRIFT_GENERATED_REPLAY_DATASET:-drift/replay/messages.generated.jsonl}
+
+## Compute demo drift metrics from SQLite event store into JSON artifacts
+compute-demo-metrics:
+	$(PYTHON_INTERPRETER) -m drift.demo.metrics_worker compute --db-path $${DRIFT_EVENTS_DB:-drift/artifacts/demo/events.sqlite} --config drift/configs/runner.yaml --mode $${DRIFT_MODE:-debug} --window-size $${DRIFT_DEMO_WINDOW_SIZE:-20} --step-size $${DRIFT_DEMO_STEP_SIZE:-20} --output-root $${DRIFT_DEMO_OUTPUT_ROOT:-drift/artifacts/demo/runs}
+
+## Generate online synthetic traffic and save classifier responses to SQLite
+run-online-traffic:
+	$(PYTHON_INTERPRETER) -m drift.online.traffic_worker --db-path $${DRIFT_EVENTS_DB:-drift/artifacts/demo/events.sqlite} --config drift/configs/runner.yaml --mode $${DRIFT_MODE:-debug} --count $${DRIFT_ONLINE_COUNT:-10} --interval-seconds $${DRIFT_ONLINE_INTERVAL_SECONDS:-1} --hidden-phase $${DRIFT_HIDDEN_PHASE:-normal}
+
+## Label a random batch of unlabeled online events with synthetic expert
+run-expert-batch:
+	$(PYTHON_INTERPRETER) -m drift.online.expert_worker --db-path $${DRIFT_EVENTS_DB:-drift/artifacts/demo/events.sqlite} --config drift/configs/runner.yaml --mode $${DRIFT_MODE:-debug} --batch-size $${DRIFT_EXPERT_BATCH_SIZE:-10} --lookback-minutes $${DRIFT_EXPERT_LOOKBACK_MINUTES:-30}
+
+## Export labeled critical-window events for future retraining
+export-training-candidates:
+	$(PYTHON_INTERPRETER) -m drift.demo.metrics_worker export-candidates --db-path $${DRIFT_EVENTS_DB:-drift/artifacts/demo/events.sqlite} --output $${DRIFT_TRAINING_CANDIDATES:-drift/artifacts/demo/training_candidates.csv}
 
 ## Reproduce DVC pipeline (prepare + train)
 dvc-repro:
@@ -229,6 +257,11 @@ monitoring-up:
 ## Stop Prometheus + Grafana + drift exporter
 monitoring-down:
 	docker compose -f docker-compose.monitoring.yml down
+
+## Restart Prometheus + Grafana + drift exporter with rebuild/recreate
+monitoring-restart:
+	docker compose -f docker-compose.monitoring.yml down
+	docker compose -f docker-compose.monitoring.yml up -d --build --force-recreate
 
 ## Show monitoring stack container status
 monitoring-status:
