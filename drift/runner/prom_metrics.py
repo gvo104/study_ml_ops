@@ -41,7 +41,6 @@ def build_prom_metrics_latest(
             "token_label_association_drift"
         ),
         "drift_window_status_code": STATUS_TO_CODE.get(status, 0),
-        "drift_window_phase": latest_window.get("phase"),
         "drift_window_index": latest_window.get("window_index"),
         "drift_insufficient_data_flag": int(
             latest_window.get("token_label_association_status") == "insufficient_data"
@@ -49,7 +48,6 @@ def build_prom_metrics_latest(
         "labels": {
             "run_id": run_id,
             "mode": mode,
-            "phase": latest_window.get("phase"),
             "status": status,
         },
     }

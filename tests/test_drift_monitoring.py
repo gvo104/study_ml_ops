@@ -20,6 +20,16 @@ from drift.monitoring.exporter import (
 )
 
 
+def _assert_phase_only_in_metric_status(output: str):
+    metric_lines = [line for line in output.splitlines() if line.startswith("drift_")]
+    general_lines = [
+        line
+        for line in metric_lines
+        if not line.startswith("drift_window_metric_status_code")
+    ]
+    assert all("phase=" not in line for line in general_lines)
+
+
 def test_resolve_metrics_path_picks_latest_run_directory(tmp_path):
     older = tmp_path / "20260620T100000Z_debug"
     newer = tmp_path / "20260621T192330Z_debug"
@@ -81,7 +91,6 @@ def test_generate_metrics_text_handles_missing_file():
     assert "drift_metrics_file_present{" in output
     assert 'run_id="unknown"' in output
     assert 'mode="unknown"' in output
-    assert 'phase="unknown"' in output
     assert 'status="unknown"' in output
     assert " 0.0" in output
     assert "drift_token_distribution_jsd" not in output
@@ -127,7 +136,7 @@ def test_generate_metrics_text_exports_numeric_metrics_and_labels(tmp_path):
     assert "drift_expert_confidence_mean{" in output
     assert 'run_id="run-1"' in output
     assert 'mode="debug"' in output
-    assert 'phase="D_association"' in output
+    _assert_phase_only_in_metric_status(output)
     assert 'status="critical"' in output
     assert "0.11" in output
     assert "drift_window_status_code{" in output
@@ -205,8 +214,9 @@ def test_window_metrics_history_is_exported(tmp_path):
     assert "drift_window_model_confidence_mean{" in output
     assert "drift_window_expert_confidence_mean{" in output
     assert 'window_index="0"' in output
-    assert 'phase="A_baseline"' in output
     assert "drift_window_metric_status_code{" in output
+    assert 'phase="A_baseline"' in output
+    _assert_phase_only_in_metric_status(output)
     assert 'metric="model_expert_macro_f1"' in output
     assert "1.0" in output
 
@@ -339,7 +349,7 @@ def test_replay_changes_latest_metrics_to_current_window(tmp_path):
 
     assert "drift_token_distribution_jsd{" in output
     assert "drift_model_prediction_distribution_jsd{" in output
-    assert 'phase="A_baseline"' in output
+    assert 'phase="A_baseline"' not in output
     assert "0.123" in output
     assert "0.234" in output
 
@@ -414,6 +424,6 @@ async def test_exporter_health_and_metrics_endpoints(tmp_path):
     assert "drift_expert_confidence_mean{" in metrics.text
     assert 'run_id="run-2"' in metrics.text
     assert 'mode="full"' in metrics.text
-    assert 'phase="A_baseline"' in metrics.text
+    _assert_phase_only_in_metric_status(metrics.text)
     assert 'status="ok"' in metrics.text
     assert "0.7" in metrics.text

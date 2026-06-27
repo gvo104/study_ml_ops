@@ -69,8 +69,9 @@ WINDOW_METRIC_SPECS = {
 FILE_PRESENT_METRIC = "drift_metrics_file_present"
 WINDOW_FILE_PRESENT_METRIC = "drift_window_metrics_file_present"
 LAST_UPDATE_METRIC = "drift_metrics_last_update_timestamp"
-LABEL_NAMES = ("run_id", "mode", "phase", "status")
-WINDOW_LABEL_NAMES = ("run_id", "mode", "phase", "status", "window_index")
+LABEL_NAMES = ("run_id", "mode", "status")
+WINDOW_LABEL_NAMES = ("run_id", "mode", "status", "window_index")
+WINDOW_METRIC_STATUS_LABEL_NAMES = ("run_id", "mode", "phase", "status", "window_index")
 
 
 @dataclass(frozen=True)
@@ -239,7 +240,6 @@ def _build_latest_payload_from_window(
     status = str(window.get("overall_status", "unknown"))
     run_id = str(base_payload.get("run_id", "unknown"))
     mode = str(base_payload.get("drift_runner_mode", "unknown"))
-    phase = str(window.get("phase", "unknown"))
     return {
         "run_id": run_id,
         "drift_runner_mode": mode,
@@ -258,7 +258,6 @@ def _build_latest_payload_from_window(
             "token_label_association_drift"
         ),
         "drift_window_status_code": STATUS_TO_CODE.get(status, -1),
-        "drift_window_phase": phase,
         "drift_window_index": window.get("window_index"),
         "drift_insufficient_data_flag": int(
             window.get("token_label_association_status") == "insufficient_data"
@@ -266,7 +265,6 @@ def _build_latest_payload_from_window(
         "labels": {
             "run_id": run_id,
             "mode": mode,
-            "phase": phase,
             "status": status,
         },
     }
@@ -373,13 +371,13 @@ def _build_window_history_metrics(
 
     window_info = GaugeMetricFamily(
         "drift_window_info",
-        "Window history info sample carrying run, phase, status and window labels.",
+        "Window history info sample carrying run, status and window labels.",
         labels=list(WINDOW_LABEL_NAMES),
     )
     metric_status_family = GaugeMetricFamily(
         "drift_window_metric_status_code",
         "Per-window per-metric status code: 0=ok, 1=warning, 2=critical, 3=insufficient_data.",
-        labels=[*WINDOW_LABEL_NAMES, "metric"],
+        labels=[*WINDOW_METRIC_STATUS_LABEL_NAMES, "metric"],
     )
     metric_families = {
         metric_name: GaugeMetricFamily(
@@ -402,9 +400,15 @@ def _build_window_history_metrics(
 
         metric_statuses = window.get("metric_statuses") or {}
         if isinstance(metric_statuses, dict):
+            metric_status_labels = _window_metric_status_labels(
+                window,
+                run_id=run_id,
+                mode=mode,
+            )
+            metric_status_values = list(metric_status_labels.values())
             for metric, metric_status in metric_statuses.items():
                 metric_status_family.add_metric(
-                    [*label_values, str(metric)],
+                    [*metric_status_values, str(metric)],
                     float(STATUS_TO_CODE.get(str(metric_status), -1)),
                 )
 
@@ -429,6 +433,19 @@ def _window_labels(
     return {
         "run_id": run_id,
         "mode": mode,
+        "status": str(window.get("overall_status", "unknown")),
+        "window_index": str(window.get("window_index", "unknown")),
+    }
+
+
+def _window_metric_status_labels(
+    window: dict[str, Any],
+    run_id: str,
+    mode: str,
+) -> dict[str, str]:
+    return {
+        "run_id": run_id,
+        "mode": mode,
         "phase": str(window.get("phase", "unknown")),
         "status": str(window.get("overall_status", "unknown")),
         "window_index": str(window.get("window_index", "unknown")),
@@ -440,7 +457,6 @@ def _latest_window_labels(payload: dict[str, Any]) -> dict[str, str]:
     return {
         "run_id": labels["run_id"],
         "mode": labels["mode"],
-        "phase": labels["phase"],
         "status": labels["status"],
         "window_index": str(payload.get("drift_window_index", "unknown")),
     }
