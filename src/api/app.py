@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -30,8 +31,9 @@ async def lifespan(app: FastAPI):
 def initialize_runtime():
     global _startup_error
 
-    import nltk
-    nltk.download('punkt')
+    if os.getenv("CI_SMOKE_MODE", "").lower() != "true":
+        import nltk
+        nltk.download('punkt')
 
     dataset_ready, dataset_message = ensure_dataset()
     reload_predictor()

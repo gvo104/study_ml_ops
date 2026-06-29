@@ -1,4 +1,4 @@
-name: Deploy to Kubernetes
+name: Kubernetes Manifests
 
 on:
   push:
@@ -16,62 +16,67 @@ on:
       - '.github/workflows/deploy.yml'
 
 env:
-  KUBE_CONTEXT: production  # Change to your Kubernetes context name
-  ARGOCD_SERVER: https://argocd.your-domain.com
-  ARGOCD_USERNAME: ${{ secrets.ARG OCD_USERNAME }}
-  ARGOCD_PASSWORD: ${{ secrets.ARG OCD_PASSWORD }}
+  ARGOCD_SERVER: ${{ secrets.ARGOCD_SERVER }}
+  ARGOCD_USERNAME: ${{ secrets.ARGOCD_USERNAME }}
+  ARGOCD_PASSWORD: ${{ secrets.ARGOCD_PASSWORD }}
+  ARGOCD_APP: ml-team-app
 
 jobs:
-  deploy:
-    name: Deploy to Argo CD
+  validate:
+    name: Validate manifests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Kustomize
-        uses: imranzaidi/kustomize-action@v1.8.0
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
         with:
-          version: v5.0.0
+          version: latest
 
-      - name: Verify manifests
+      - name: Render Kustomize manifests
+        run: kubectl kustomize k8s/base > rendered-manifests.yml
+
+      - name: Validate rendered manifests
+        run: kubectl apply --dry-run=client --validate=false -f rendered-manifests.yml
+
+      - name: Upload rendered manifests
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendered-k8s-manifests
+          path: rendered-manifests.yml
+
+  argocd-sync:
+    name: Sync Argo CD on main
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Install Argo CD CLI
+        if: env.ARGOCD_SERVER != '' && env.ARGOCD_USERNAME != '' && env.ARGOCD_PASSWORD != ''
         run: |
-          kubectl apply --dry-run=client -f ./k8s/base/ || true
+          curl -sSL -o argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+          sudo install -m 0755 argocd /usr/local/bin/argocd
 
-      - name: Deploy to Argo CD (push)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: azure/k8s-arcd-action@v1
-        with:
-          namespace: argocd
-          application-name: ml-team-app
-          username: ${{ secrets.ARG OCD_USERNAME }}
-          password: ${{ secrets.ARG OCD_PASSWORD }}
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          server: ${{ env.ARGOCD_SERVER }}
-        env:
-          ARGOCD_SERVER: ${{ env.ARGOCD_SERVER }}
-          ARGOCD_USERNAME: ${{ secrets.ARG OCD_USERNAME }}
-          ARGOCD_PASSWORD: ${{ secrets.ARG OCD_PASSWORD }}
+      - name: Sync application
+        if: env.ARGOCD_SERVER != '' && env.ARGOCD_USERNAME != '' && env.ARGOCD_PASSWORD != ''
+        run: |
+          argocd login "${ARGOCD_SERVER}" \
+            --username "${ARGOCD_USERNAME}" \
+            --password "${ARGOCD_PASSWORD}" \
+            --grpc-web
+          argocd app sync "${ARGOCD_APP}" --grpc-web
+          argocd app wait "${ARGOCD_APP}" --health --sync --timeout 300 --grpc-web
 
-      - name: Deploy to Argo CD (PR review)
-        if: github.event_name == 'pull_request'
-        uses: azure/k8s-arcd-action@v1
-        with:
-          namespace: argocd
-          application-name: ml-team-app
-          username: ${{ secrets.ARG OCD_USERNAME }}
-          password: ${{ secrets.ARG OCD_PASSWORD }}
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          server: ${{ env.ARGOCD_SERVER }}
-          auto-pr-review: true
-        env:
-          ARGOCD_SERVER: ${{ env.ARGOCD_SERVER }}
-          ARGOCD_USERNAME: ${{ secrets.ARG OCD_USERNAME }}
-          ARGOCD_PASSWORD: ${{ secrets.ARG OCD_PASSWORD }}
+      - name: Skip sync when secrets are absent
+        if: env.ARGOCD_SERVER == '' || env.ARGOCD_USERNAME == '' || env.ARGOCD_PASSWORD == ''
+        run: echo "ARGOCD_SERVER, ARGOCD_USERNAME, or ARGOCD_PASSWORD is not configured; skipping Argo CD sync."
 
   notify:
     name: Notify on failure
-    needs: deploy
+    needs:
+      - validate
+      - argocd-sync
     runs-on: ubuntu-latest
     if: failure()
     steps:

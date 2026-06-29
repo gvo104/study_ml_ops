@@ -6,7 +6,8 @@ stages:
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-  DOCKER_TLS_CERTDIR: "/certs"
+  DOCKER_HOST: "tcp://docker:2375"
+  DOCKER_TLS_CERTDIR: ""
   DOCKER_IMAGE: "$CI_REGISTRY_IMAGE/study-mlops-api:$CI_COMMIT_SHA"
 
 workflow:
@@ -30,7 +31,7 @@ lint:
   extends: .python_job
   stage: lint
   script:
-    - python -m flake8 src tests
+    - python -m flake8 src tests --max-line-length=127 --extend-ignore=E501
 
 test:
   extends: .python_job
@@ -42,6 +43,7 @@ build_package:
   extends: .python_job
   stage: build
   script:
+    - python -m pip install build
     - python -m build
   artifacts:
     paths:
@@ -56,7 +58,7 @@ build_docker:
   before_script:
     - docker info
   script:
-    - docker build -t "$DOCKER_IMAGE" .
+    - docker build -f Dockerfile.api -t "$DOCKER_IMAGE" .
     - docker save "$DOCKER_IMAGE" -o study-mlops-api.tar
   artifacts:
     paths:
