@@ -1,29 +1,27 @@
 services:
-  drift-exporter:
+  drift-v2-exporter:
     build:
       context: .
       dockerfile: Dockerfile.monitoring
-    container_name: drift-exporter
+    container_name: drift-v2-exporter
     restart: unless-stopped
     ports:
-      - "9108:9108"
-    environment:
-      DRIFT_REPLAY_ENABLED: "true"
-      DRIFT_REPLAY_STEP_SECONDS: "15"
-      DRIFT_REPLAY_LOOP: "true"
+      - "9208:9208"
+    command: ["uvicorn", "drift_v2.monitoring.app:app", "--host", "0.0.0.0", "--port", "9208"]
     volumes:
-      - ./drift/artifacts/runs:/app/drift/artifacts/runs:ro
+      - ./drift_v2/artifacts/runs:/app/drift_v2/artifacts/runs:ro
 
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
     restart: unless-stopped
     depends_on:
-      - drift-exporter
+      - drift-v2-exporter
     ports:
       - "9090:9090"
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/drift_v2_rules.yml:/etc/prometheus/drift_v2_rules.yml:ro
 
   grafana:
     image: grafana/grafana:11.2.2
