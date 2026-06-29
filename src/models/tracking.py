@@ -13,6 +13,14 @@ from src.config import (
 logger = logging.getLogger(__name__)
 
 
+def mlflow_tracking_status() -> dict[str, Any]:
+    return {
+        "enabled": MLFLOW_ENABLED,
+        "uri": MLFLOW_TRACKING_URI,
+        "experiment_name": MLFLOW_EXPERIMENT_NAME,
+    }
+
+
 def is_mlflow_available() -> bool:
     if not MLFLOW_ENABLED:
         return False
@@ -27,6 +35,79 @@ def is_mlflow_available() -> bool:
     except Exception as exc:
         logger.warning("MLflow unavailable (%s). Using local artifacts only.", exc)
         return False
+
+
+def list_mlflow_runs(max_results: int = 25) -> dict[str, Any]:
+    """Return recent MLflow experiments and runs for the web UI."""
+    status = mlflow_tracking_status()
+    if not MLFLOW_ENABLED:
+        return {
+            **status,
+            "connected": False,
+            "error": "MLFLOW_ENABLED is false.",
+            "experiments": [],
+            "runs": [],
+        }
+
+    try:
+        configure_mlflow_environment()
+        from mlflow.entities import ViewType
+        from mlflow.tracking import MlflowClient
+
+        client = MlflowClient(tracking_uri=MLFLOW_TRACKING_URI)
+        experiments = client.search_experiments(
+            view_type=ViewType.ACTIVE_ONLY,
+            max_results=100,
+        )
+        experiment_payload = [
+            {
+                "experiment_id": experiment.experiment_id,
+                "name": experiment.name,
+                "lifecycle_stage": experiment.lifecycle_stage,
+                "artifact_location": experiment.artifact_location,
+            }
+            for experiment in experiments
+        ]
+
+        experiment_ids = [experiment.experiment_id for experiment in experiments]
+        runs = []
+        if experiment_ids:
+            for run in client.search_runs(
+                experiment_ids=experiment_ids,
+                max_results=max_results,
+                order_by=["attributes.start_time DESC"],
+            ):
+                runs.append(
+                    {
+                        "run_id": run.info.run_id,
+                        "experiment_id": run.info.experiment_id,
+                        "run_name": run.data.tags.get("mlflow.runName", run.info.run_id),
+                        "status": run.info.status,
+                        "start_time": run.info.start_time,
+                        "end_time": run.info.end_time,
+                        "artifact_uri": run.info.artifact_uri,
+                        "metrics": dict(run.data.metrics),
+                        "params": dict(run.data.params),
+                        "tags": dict(run.data.tags),
+                    }
+                )
+
+        return {
+            **status,
+            "connected": True,
+            "error": None,
+            "experiments": experiment_payload,
+            "runs": runs,
+        }
+    except Exception as exc:
+        logger.warning("Could not read MLflow runs (%s).", exc)
+        return {
+            **status,
+            "connected": False,
+            "error": str(exc),
+            "experiments": [],
+            "runs": [],
+        }
 
 
 @contextmanager

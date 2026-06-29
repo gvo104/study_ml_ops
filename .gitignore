@@ -130,3 +130,7 @@ minio_data/
 study_ml_ops/models/
 study_ml_ops/reports/figures/
 PROJECT_CONTEXT.md
+minio/
+mlflow/
+metadata/
+restore_minio_mlflow_state.sh

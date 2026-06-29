@@ -32,7 +32,7 @@ make predict TEXT="I feel sad and anxious and cannot sleep."
 | `make predict TEXT="..."` | CLI-инференс |
 | `make test` | pytest |
 | `make serve` | FastAPI http://localhost:8000 |
-| `make infra-up` | MinIO + MLflow (Docker) |
+| `make infra-up` | MinIO + MLflow + web UI (Docker) |
 | `make dvc-repro` | DVC: prepare → train |
 | `study-mlops experiments` | То же, что `make experiments` |
 
@@ -77,6 +77,7 @@ study_ml_ops/
 - **MLflow** — метрики, модель, `evaluation/confusion_matrix.png` ([гайд](docs/mlflow-minio-setup.md))
 - **DVC** — версионирование данных (`dvc pull` / `dvc push`)
 - **API** — `POST /predict` с `{"text": "..."}`
+- **Web UI** — `http://localhost:8000/` и `http://localhost:8000/experiments` через `docker compose up --build`
 
 ## Документация
 

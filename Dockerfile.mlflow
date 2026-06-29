@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Python dependencies
 RUN pip install --no-cache-dir \
-    mlflow==2.* \
+    "mlflow>=3,<4" \
     boto3 \
     psycopg2-binary \
     fastapi \
@@ -25,4 +25,4 @@ RUN pip install --no-cache-dir -r requirements.txt 2>/dev/null || true
 EXPOSE 5000
 
 # Default command (can be overridden at runtime)
-CMD ["mlflow", "server", "--host", "0.0.0.0", "--port", "5000"]
+CMD ["mlflow", "server", "--host", "0.0.0.0", "--port", "5000", "--allowed-hosts", "localhost,127.0.0.1,mlflow,mlflow:5000", "--disable-security-middleware"]
