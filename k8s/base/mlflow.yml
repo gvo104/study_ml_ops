@@ -38,6 +38,11 @@ spec:
             secretKeyRef:
               name: minio-secret
               key: AWS_SECRET_ACCESS_KEY
+        - name: AWS_DEFAULT_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: AWS_DEFAULT_REGION
         command: ["/bin/sh", "-c"]
         args:
           - |
@@ -78,6 +83,11 @@ spec:
             secretKeyRef:
               name: minio-secret
               key: AWS_SECRET_ACCESS_KEY
+        - name: AWS_DEFAULT_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: AWS_DEFAULT_REGION
         command: ["/bin/sh", "-c"]
         args:
           - |
@@ -101,7 +111,7 @@ spec:
         - --port
         - "5000"
         - --allowed-hosts
-        - localhost,127.0.0.1,mlflow,mlflow:5000,mlflow.ml-team.svc,mlflow.ml-team.svc.cluster.local
+        - localhost,localhost:5000,localhost:30500,127.0.0.1,127.0.0.1:5000,127.0.0.1:30500,mlflow,mlflow:5000,mlflow.ml-team.svc,mlflow.ml-team.svc.cluster.local
         - --disable-security-middleware
         ports:
         - containerPort: 5000
@@ -164,4 +174,5 @@ spec:
   - name: server
     port: 5000
     targetPort: 5000
-  type: ClusterIP
+    nodePort: 30500
+  type: NodePort
