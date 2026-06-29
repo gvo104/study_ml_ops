@@ -69,7 +69,10 @@ def main(data_path, configs_dir, pattern):
         )
 
     best = max(results, key=lambda r: r["macro_f1"])
-    click.echo(f"\nBest by macro_f1: {best['run_name']} ({best['macro_f1']:.4f})")
+    click.echo(
+        f"\nBest by macro_f1: {best['run_name']} "
+        f"({best['macro_f1']:.4f})"
+    )
 
 
 if __name__ == "__main__":

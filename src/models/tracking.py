@@ -25,7 +25,10 @@ def is_mlflow_available() -> bool:
         client.search_experiments(max_results=1)
         return True
     except Exception as exc:
-        logger.warning("MLflow unavailable (%s). Using local artifacts only.", exc)
+        logger.warning(
+            "MLflow unavailable (%s). Using local artifacts only.",
+            exc,
+        )
         return False
 
 
@@ -77,7 +80,8 @@ def log_training_results(
 ) -> None:
     """Log metrics, model and artifacts to the active MLflow run.
 
-    report_artifacts: paths to log under evaluation/ (e.g. confusion matrix).
+    report_artifacts:
+        paths to log under evaluation/ (e.g. confusion matrix).
     """
     if not is_mlflow_available():
         return
@@ -98,7 +102,10 @@ def log_training_results(
                 mlflow.log_artifact(str(path), artifact_path="evaluation")
 
         if artifacts_dir is not None and Path(artifacts_dir).exists():
-            mlflow.log_artifacts(str(artifacts_dir), artifact_path="model_bundle")
+            mlflow.log_artifacts(
+                str(artifacts_dir),
+                artifact_path="model_bundle",
+            )
 
         logger.info("MLflow run logged successfully.")
     except Exception as exc:

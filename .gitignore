@@ -70,6 +70,9 @@ target/
 
 # VS Code
 .vscode/
+.agents
+.codex
+
 
 # Spyder
 .spyproject/

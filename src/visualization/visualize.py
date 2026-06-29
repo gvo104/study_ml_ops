@@ -1,10 +1,10 @@
 from pathlib import Path
 
 import matplotlib
+from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
-from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
 
 
 def plot_confusion_matrix(

@@ -1,6 +1,9 @@
 from typing import Any, Callable
 
-from src.models.sklearn_models import build_logistic_regression, build_random_forest
+from src.models.sklearn_models import (
+    build_logistic_regression,
+    build_random_forest,
+)
 from src.models.xgboost_model import build_xgboost
 
 

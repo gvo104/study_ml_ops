@@ -49,10 +49,14 @@ class ExperimentConfig:
     model: ModelConfig = field(default_factory=ModelConfig)
     features: FeaturesConfig = field(default_factory=FeaturesConfig)
     training: TrainingConfig = field(default_factory=TrainingConfig)
-    experiment: ExperimentMetaConfig = field(default_factory=ExperimentMetaConfig)
+    experiment: ExperimentMetaConfig = field(
+        default_factory=ExperimentMetaConfig
+    )
 
 
-def _parse_ngram_range(value: list[int] | tuple[int, int]) -> tuple[int, int]:
+def _parse_ngram_range(
+    value: list[int] | tuple[int, int]
+) -> tuple[int, int]:
     return tuple(value)  # type: ignore[return-value]
 
 

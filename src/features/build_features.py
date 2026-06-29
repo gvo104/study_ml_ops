@@ -3,7 +3,12 @@ import numpy as np
 from sklearn.decomposition import TruncatedSVD
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from src.config import NGRAM_RANGE, RANDOM_STATE, SVD_COMPONENTS, TFIDF_MAX_FEATURES
+from src.config import (
+    NGRAM_RANGE,
+    RANDOM_STATE,
+    SVD_COMPONENTS,
+    TFIDF_MAX_FEATURES,
+)
 from src.config_loader import FeaturesConfig
 from src.features.numerical import extract_numerical_features
 from src.features.preprocess import preprocess_single
