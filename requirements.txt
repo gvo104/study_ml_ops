@@ -14,8 +14,11 @@ lightgbm
 joblib
 pyyaml
 matplotlib
+mlflow==2.*
+boto3
+dvc[s3]
 
-# serving (optional — use conda env for full MLOps stack)
+# serving
 fastapi
 uvicorn
 pydantic

@@ -1,14 +1,11 @@
-version: '3.8'
-
 services:
-  # === S3-хранилище (MinIO) ===
   minio:
     image: minio/minio
     container_name: minio
     restart: unless-stopped
     ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # Веб-консоль
+      - "9000:9000"
+      - "9001:9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
@@ -21,7 +18,6 @@ services:
       timeout: 5s
       retries: 3
 
-  # === Автосоздание бакета при первом старте ===
   minio-init:
     image: amazon/aws-cli
     container_name: minio-init
@@ -31,19 +27,16 @@ services:
     environment:
       AWS_ACCESS_KEY_ID: minioadmin
       AWS_SECRET_ACCESS_KEY: minioadmin
-    entrypoint: |
+    entrypoint: >
       sh -c "
-      aws --endpoint-url http://minio:9000 s3 mb s3://ml-team || true
-      echo 'Bucket ml-team готов'
+      aws --endpoint-url http://minio:9000 s3 mb s3://ml-team || true &&
+      echo 'Bucket ml-team ready'
       "
-    networks:
-      - default
 
-  # === MLflow Tracking Server ===
   mlflow:
     build:
       context: .
-      dockerfile: Dockerfile.mlflow   # Создадим ниже
+      dockerfile: Dockerfile.mlflow
     container_name: mlflow
     restart: unless-stopped
     ports:
@@ -53,6 +46,7 @@ services:
       AWS_ACCESS_KEY_ID: minioadmin
       AWS_SECRET_ACCESS_KEY: minioadmin
       AWS_DEFAULT_REGION: us-east-1
+      MLFLOW_SERVER_ALLOWED_HOSTS: localhost,127.0.0.1,mlflow,mlflow:5000
     volumes:
       - mlflow_data:/mlflow_data
     command: >
@@ -61,9 +55,40 @@ services:
         --default-artifact-root s3://ml-team/mlflow-artifacts
         --host 0.0.0.0
         --port 5000
+        --allowed-hosts localhost,127.0.0.1,mlflow,mlflow:5000
+        --disable-security-middleware
     depends_on:
       minio-init:
         condition: service_completed_successfully
+
+  webapp:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: study-mlops-webapp
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_ENABLED: "true"
+      AWS_ENDPOINT_URL: http://minio:9000
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      DVC_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_DEFAULT_REGION: us-east-1
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+    depends_on:
+      mlflow:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   minio_data:
