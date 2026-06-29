@@ -1,11 +1,9 @@
 import json
-from pathlib import Path
 
 import click
 
 from src.config import DATA_PATH, DEFAULT_CONFIG_PATH
 from src.config_loader import load_config
-from src.models.registry import load_predictor
 from src.models.trainer import train
 
 

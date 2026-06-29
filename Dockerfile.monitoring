@@ -1,0 +1,11 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir fastapi uvicorn prometheus-client
+
+COPY drift_v2 ./drift_v2
+
+ENV PYTHONPATH=/app
+
+CMD ["uvicorn", "drift_v2.monitoring.app:app", "--host", "0.0.0.0", "--port", "9208"]

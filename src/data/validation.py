@@ -1,6 +1,6 @@
 import pandas as pd
 
-from src.config import NUMERICAL_COLUMNS, RAW_TEXT_COLUMN, TARGET_COLUMN, TEXT_COLUMN
+from src.config import NUMERICAL_COLUMNS, TARGET_COLUMN, TEXT_COLUMN
 
 
 class DatasetValidationError(ValueError):

@@ -70,6 +70,9 @@ target/
 
 # VS Code
 .vscode/
+.agents
+.codex
+
 
 # Spyder
 .spyproject/
@@ -134,3 +137,10 @@ minio/
 mlflow/
 metadata/
 restore_minio_mlflow_state.sh
+
+
+drift_v2/models
+drift_v2/reference/
+reference/
+drift_v2/artifacts/
+reports

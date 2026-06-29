@@ -1,0 +1,113 @@
+groups:
+  - name: drift_v2_clean_demo
+    interval: 5s
+    rules:
+      - alert: DriftV2TokenDistributionWarning
+        expr: (drift_v2_token_distribution_jsd > 0.35) and on(run_id, mode, pipeline) (drift_v2_metrics_file_present == 1)
+        for: 30s
+        labels:
+          severity: warning
+          service: drift_v2
+        annotations:
+          summary: "drift_v2 token distribution drift is elevated"
+          description: "pipeline={{ $labels.pipeline }} run_id={{ $labels.run_id }} window={{ $labels.window_index }} token_distribution_jsd={{ $value }}"
+
+      - alert: DriftV2TokenDistributionCritical
+        expr: (drift_v2_token_distribution_jsd > 0.38) and on(run_id, mode, pipeline) (drift_v2_metrics_file_present == 1)
+        for: 30s
+        labels:
+          severity: critical
+          service: drift_v2
+        annotations:
+          summary: "drift_v2 token distribution drift is critical"
+          description: "pipeline={{ $labels.pipeline }} run_id={{ $labels.run_id }} window={{ $labels.window_index }} token_distribution_jsd={{ $value }}"
+
+      - alert: DriftV2PredictionDistributionWarning
+        expr: (drift_v2_model_prediction_distribution_jsd > 0.55) and on(run_id, mode, pipeline) (drift_v2_metrics_file_present == 1)
+        for: 30s
+        labels:
+          severity: warning
+          service: drift_v2
+        annotations:
+          summary: "drift_v2 prediction distribution drift is elevated"
+          description: "pipeline={{ $labels.pipeline }} run_id={{ $labels.run_id }} window={{ $labels.window_index }} model_prediction_distribution_jsd={{ $value }}"
+
+      - alert: DriftV2PredictionDistributionCritical
+        expr: (drift_v2_model_prediction_distribution_jsd > 0.62) and on(run_id, mode, pipeline) (drift_v2_metrics_file_present == 1)
+        for: 30s
+        labels:
+          severity: critical
+          service: drift_v2
+        annotations:
+          summary: "drift_v2 prediction distribution drift is critical"
+          description: "pipeline={{ $labels.pipeline }} run_id={{ $labels.run_id }} window={{ $labels.window_index }} model_prediction_distribution_jsd={{ $value }}"
+
+      - alert: DriftV2ExpertDistributionWarning
+        expr: (drift_v2_target_distribution_jsd > 0.32) and on(run_id, mode, pipeline) (drift_v2_metrics_file_present == 1)
+        for: 30s
+        labels:
+          severity: warning
+          service: drift_v2
+        annotations:
+          summary: "drift_v2 expert distribution drift is elevated"
+          description: "pipeline={{ $labels.pipeline }} run_id={{ $labels.run_id }} window={{ $labels.window_index }} target_distribution_jsd={{ $value }}"
+
+      - alert: DriftV2ExpertDistributionCritical
+        expr: (drift_v2_target_distribution_jsd > 0.45) and on(run_id, mode, pipeline) (drift_v2_metrics_file_present == 1)
+        for: 30s
+        labels:
+          severity: critical
+          service: drift_v2
+        annotations:
+          summary: "drift_v2 expert distribution drift is critical"
+          description: "pipeline={{ $labels.pipeline }} run_id={{ $labels.run_id }} window={{ $labels.window_index }} target_distribution_jsd={{ $value }}"
+
+      - alert: DriftV2ModelExpertDisagreementWarning
+        expr: (drift_v2_model_expert_disagreement_rate > 0.78) and on(run_id, mode, pipeline) (drift_v2_metrics_file_present == 1)
+        for: 30s
+        labels:
+          severity: warning
+          service: drift_v2
+        annotations:
+          summary: "drift_v2 model-expert disagreement is elevated"
+          description: "pipeline={{ $labels.pipeline }} run_id={{ $labels.run_id }} window={{ $labels.window_index }} disagreement_rate={{ $value }}"
+
+      - alert: DriftV2ModelExpertDisagreementCritical
+        expr: (drift_v2_model_expert_disagreement_rate > 0.85) and on(run_id, mode, pipeline) (drift_v2_metrics_file_present == 1)
+        for: 30s
+        labels:
+          severity: critical
+          service: drift_v2
+        annotations:
+          summary: "drift_v2 model-expert disagreement is critical"
+          description: "pipeline={{ $labels.pipeline }} run_id={{ $labels.run_id }} window={{ $labels.window_index }} disagreement_rate={{ $value }}"
+
+      - alert: DriftV2MacroF1Warning
+        expr: (drift_v2_model_expert_macro_f1 < 0.18) and on(run_id, mode, pipeline) (drift_v2_metrics_file_present == 1)
+        for: 30s
+        labels:
+          severity: warning
+          service: drift_v2
+        annotations:
+          summary: "drift_v2 macro F1 is degraded"
+          description: "pipeline={{ $labels.pipeline }} run_id={{ $labels.run_id }} window={{ $labels.window_index }} macro_f1={{ $value }}"
+
+      - alert: DriftV2MacroF1Critical
+        expr: (drift_v2_model_expert_macro_f1 < 0.12) and on(run_id, mode, pipeline) (drift_v2_metrics_file_present == 1)
+        for: 30s
+        labels:
+          severity: critical
+          service: drift_v2
+        annotations:
+          summary: "drift_v2 macro F1 is critically low"
+          description: "pipeline={{ $labels.pipeline }} run_id={{ $labels.run_id }} window={{ $labels.window_index }} macro_f1={{ $value }}"
+
+      - alert: DriftV2ArtifactsStale
+        expr: ((time() - drift_v2_metrics_last_update_timestamp) > 30) and on(run_id, mode, pipeline) (drift_v2_metrics_file_present == 1)
+        for: 1m
+        labels:
+          severity: warning
+          service: drift_v2
+        annotations:
+          summary: "drift_v2 artifacts are stale"
+          description: "pipeline={{ $labels.pipeline }} run_id={{ $labels.run_id }} last_update_age_seconds={{ $value }}"

@@ -1,0 +1,48 @@
+from dataclasses import dataclass
+from pathlib import Path
+import os
+
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
+
+DEFAULT_MODEL_PATH = (
+    Path("drift_v2")
+    / "models"
+    / "Qwen2.5-3B-Instruct-GGUF"
+    / "qwen2.5-3b-instruct-q4_k_m.gguf"
+)
+
+
+@dataclass(frozen=True)
+class SyntheticApiSettings:
+    backend: str = "mock"
+    model_path: Path = DEFAULT_MODEL_PATH
+    host: str = "0.0.0.0"
+    port: int = 8001
+    temperature: float = 0.3
+    max_retries: int = 2
+    max_tokens: int = 256
+    context_window: int = 4096
+    gpu_layers: int = -1
+
+
+def load_settings() -> SyntheticApiSettings:
+    return SyntheticApiSettings(
+        backend=os.getenv("SYNTHETIC_LLM_BACKEND", "mock"),
+        model_path=Path(
+            os.getenv(
+                "SYNTHETIC_LLM_MODEL_PATH",
+                str(DEFAULT_MODEL_PATH),
+            )
+        ),
+        host=os.getenv("SYNTHETIC_API_HOST", "0.0.0.0"),
+        port=int(os.getenv("SYNTHETIC_API_PORT", "8001")),
+        temperature=float(os.getenv("SYNTHETIC_LLM_TEMPERATURE", "0.3")),
+        max_retries=int(os.getenv("SYNTHETIC_LLM_MAX_RETRIES", "2")),
+        max_tokens=int(os.getenv("SYNTHETIC_LLM_MAX_TOKENS", "256")),
+        context_window=int(os.getenv("SYNTHETIC_LLM_CONTEXT_WINDOW", "4096")),
+        gpu_layers=int(os.getenv("SYNTHETIC_LLM_GPU_LAYERS", "-1")),
+    )

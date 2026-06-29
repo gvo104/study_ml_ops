@@ -45,7 +45,10 @@ MLFLOW_EXPERIMENT_NAME = os.getenv(
     "MLFLOW_EXPERIMENT_NAME",
     "mental_health_classification",
 )
-MLFLOW_ENABLED = os.getenv("MLFLOW_ENABLED", "true").lower() in {"1", "true", "yes"}
+MLFLOW_ENABLED = os.getenv(
+    "MLFLOW_ENABLED",
+    "true",
+).lower() in {"1", "true", "yes"}
 
 # MinIO / S3 defaults for local MLflow artifact store
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "minioadmin")

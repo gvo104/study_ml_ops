@@ -41,7 +41,10 @@ from src.visualization.visualize import (
 logger = get_logger(__name__)
 
 
-def _prepare_text_column(df: pd.DataFrame, config: ExperimentConfig) -> pd.Series:
+def _prepare_text_column(
+    df: pd.DataFrame,
+    config: ExperimentConfig,
+) -> pd.Series:
     if config.training.repreprocess_text:
         logger.info("Re-preprocessing text column...")
         return pd.Series(
@@ -72,7 +75,10 @@ def _prepare_numerical_features(
     return df[NUMERICAL_COLUMNS].values
 
 
-def _resolve_run_name(config: ExperimentConfig, config_path: Path | str | None) -> str:
+def _resolve_run_name(
+    config: ExperimentConfig,
+    config_path: Path | str | None,
+) -> str:
     if config.experiment.run_name:
         return config.experiment.run_name
     if config_path is not None:
@@ -126,9 +132,10 @@ def train(
 
     build_model = MODEL_REGISTRY.get(config.model.name)
     if build_model is None:
+        available_models = list(MODEL_REGISTRY)
         raise ValueError(
             f"Unknown model: {config.model.name}. "
-            f"Available: {list(MODEL_REGISTRY)}"
+            f"Available: {available_models}"
         )
 
     params = config_to_mlflow_params(config)

@@ -1,12 +1,10 @@
-.PHONY: clean data environment lint requirements train predict test serve experiments dvc-repro dvc-pull sync_data_to_s3 sync_data_from_s3
+.PHONY: clean data environment lint requirements train predict test serve serve-synthetic experiments dvc-repro dvc-pull drift-monitoring-offline drift-monitoring-online monitoring-down monitoring-status infra-up infra-down infra-status infra-logs help
 
 #################################################################################
 # GLOBALS                                                                       #
 #################################################################################
 
 PROJECT_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
-BUCKET = [OPTIONAL] your-bucket-for-syncing-data (do not include 's3://')
-PROFILE = default
 PROJECT_NAME = study_ml_ops
 PYTHON_INTERPRETER = python3
 ENV_NAME = ML_Ops
@@ -22,7 +20,7 @@ endif
 #################################################################################
 
 ## Install Python dependencies with pip
-requirements: test_environment
+requirements:
 	$(PYTHON_INTERPRETER) -m pip install -U pip setuptools wheel
 	$(PYTHON_INTERPRETER) -m pip install -r requirements.txt
 
@@ -46,9 +44,36 @@ experiments:
 test:
 	$(PYTHON_INTERPRETER) -m pytest tests/ -q
 
+## Run only synthetic-api tests
+test-synthetic:
+	$(PYTHON_INTERPRETER) -m pytest tests/test_synthetic_api.py -q
+
+
 ## Start FastAPI inference server
 serve:
 	$(PYTHON_INTERPRETER) -m uvicorn src.api.app:app --reload --host 0.0.0.0 --port 8000
+
+## Start synthetic FastAPI service for generator/expert roles
+serve-synthetic:
+	$(PYTHON_INTERPRETER) -m uvicorn drift_v2.synthetic_api.app:app --reload --host $${SYNTHETIC_API_HOST:-0.0.0.0} --port $${SYNTHETIC_API_PORT:-8001}
+
+#################################################################################
+# DRIFT DEMO PIPELINE                                                           #
+#################################################################################
+
+## Restart Grafana/Prometheus/exporter and run infinite offline replay from SQLite
+drift-monitoring-offline:
+	docker compose -f docker-compose.monitoring.yml up -d --build --force-recreate grafana
+	-pkill -f 'python3 -m drift_v2.cli offline --db-path drift_v2/artifacts/demo/events.sqlite'
+	docker compose -f docker-compose.monitoring.yml up -d --build
+	DRIFT_V2_BATCH_SIZE=20 DRIFT_V2_INTERVAL_SECONDS=5 DRIFT_V2_MAX_TICKS=0 $(PYTHON_INTERPRETER) -m drift_v2.cli offline --db-path $${DRIFT_EVENTS_DB:-drift_v2/artifacts/demo/events.sqlite} --config drift_v2/configs/runner.yaml --mode $${DRIFT_MODE:-debug} --run-id $${DRIFT_V2_RUN_ID:-offline_demo_live_v2} --output-root $${DRIFT_V2_OUTPUT_ROOT:-drift_v2/artifacts/runs} --event-span $${DRIFT_V2_EVENT_SPAN:-40} --window-size $${DRIFT_V2_WINDOW_SIZE:-20} --step-size $${DRIFT_V2_STEP_SIZE:-20} --batch-size $${DRIFT_V2_BATCH_SIZE:-20} --interval-seconds $${DRIFT_V2_INTERVAL_SECONDS:-15} --max-ticks $${DRIFT_V2_MAX_TICKS:-0}
+
+## Restart Grafana/Prometheus/exporter and run infinite online synthetic loop
+drift-monitoring-online:
+	docker compose -f docker-compose.monitoring.yml up -d --build --force-recreate grafana
+	-pkill -f 'python3 -m drift_v2.cli online --db-path drift_v2/artifacts/demo/events.sqlite'
+	docker compose -f docker-compose.monitoring.yml up -d --build
+	DRIFT_V2_INTERVAL_SECONDS=5 DRIFT_V2_MAX_TICKS=0 DRIFT_V2_ONLINE_COUNT=20 DRIFT_V2_EXPERT_BATCH_SIZE=20 $(PYTHON_INTERPRETER) -m drift_v2.cli online --db-path $${DRIFT_EVENTS_DB:-drift_v2/artifacts/demo/events.sqlite} --config drift_v2/configs/runner.yaml --mode $${DRIFT_MODE:-debug} --run-id $${DRIFT_V2_ONLINE_RUN_ID:-online_demo_live_v2} --output-root $${DRIFT_V2_OUTPUT_ROOT:-drift_v2/artifacts/runs} --source-mode $${DRIFT_V2_ONLINE_SOURCE_MODE:-online_synthetic_v2} --event-span $${DRIFT_V2_EVENT_SPAN:-40} --window-size $${DRIFT_V2_WINDOW_SIZE:-20} --step-size $${DRIFT_V2_STEP_SIZE:-20} --traffic-count $${DRIFT_V2_ONLINE_COUNT:-20} --expert-batch-size $${DRIFT_V2_EXPERT_BATCH_SIZE:-20} --lookback-minutes $${DRIFT_V2_EXPERT_LOOKBACK_MINUTES:-1440} --hidden-phase $${DRIFT_V2_HIDDEN_PHASE:-A_baseline} --interval-seconds $${DRIFT_V2_INTERVAL_SECONDS:-15} --max-ticks $${DRIFT_V2_MAX_TICKS:-0}
 
 ## Reproduce DVC pipeline (prepare + train)
 dvc-repro:
@@ -193,3 +218,11 @@ infra-status:
 ## View MLflow logs
 infra-logs:
 	docker compose logs -f mlflow
+
+## Stop Prometheus + Grafana + drift_v2 exporter
+monitoring-down:
+	docker compose -f docker-compose.monitoring.yml down
+
+## Show monitoring stack container status
+monitoring-status:
+	docker compose -f docker-compose.monitoring.yml ps
