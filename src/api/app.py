@@ -31,9 +31,8 @@ async def lifespan(app: FastAPI):
 def initialize_runtime():
     global _startup_error
 
-    if os.getenv("CI_SMOKE_MODE", "").lower() != "true":
-        import nltk
-        nltk.download('punkt')
+    import nltk
+    nltk.download('punkt_tab')
 
     dataset_ready, dataset_message = ensure_dataset()
     reload_predictor()
