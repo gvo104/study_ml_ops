@@ -8,15 +8,25 @@ metadata:
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  name: app-config
+  namespace: ml-team
+data:
+  AWS_DEFAULT_REGION: "us-east-1"
+  AWS_ENDPOINT_URL: "http://minio:9000"
+  DVC_S3_ENDPOINT_URL: "http://minio:9000"
+  MLFLOW_ENABLED: "true"
+  MLFLOW_S3_ENDPOINT_URL: "http://minio:9000"
+  MLFLOW_SERVER_ALLOWED_HOSTS: "localhost,127.0.0.1,mlflow,mlflow:5000,mlflow.ml-team.svc,mlflow.ml-team.svc.cluster.local"
+  MLFLOW_TRACKING_URI: "http://mlflow:5000"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
   name: minio-config
   namespace: ml-team
 data:
   MINIO_ROOT_USER: "minioadmin"
-  MINIO_ROOT_PASSWORD: "minioadmin"
-  AWS_ACCESS_KEY_ID: "minioadmin"
-  AWS_SECRET_ACCESS_KEY: "minioadmin"
   MLFLOW_S3_ENDPOINT_URL: "http://minio:9000"
-  AWS_DEFAULT_REGION: "us-east-1"
 ---
 apiVersion: v1
 kind: Secret

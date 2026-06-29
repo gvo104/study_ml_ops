@@ -1,0 +1,157 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: webapp-models
+  namespace: ml-team
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: webapp-data
+  namespace: ml-team
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp
+  namespace: ml-team
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webapp
+  template:
+    metadata:
+      labels:
+        app: webapp
+    spec:
+      initContainers:
+      - name: seed-app-volumes
+        image: study-mlops-webapp:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            if [ -z "$(ls -A /mnt/models 2>/dev/null)" ]; then
+              cp -a /app/models/. /mnt/models/
+            fi
+            if [ -z "$(ls -A /mnt/data 2>/dev/null)" ]; then
+              cp -a /app/data/. /mnt/data/
+            fi
+        volumeMounts:
+        - name: webapp-models
+          mountPath: /mnt/models
+        - name: webapp-data
+          mountPath: /mnt/data
+      - name: wait-for-mlflow
+        image: curlimages/curl:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            until curl -fsS http://mlflow:5000/ >/dev/null; do
+              echo "Waiting for MLflow..."
+              sleep 2
+            done
+      containers:
+      - name: webapp
+        image: study-mlops-webapp:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: MLFLOW_TRACKING_URI
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: MLFLOW_TRACKING_URI
+        - name: MLFLOW_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: MLFLOW_ENABLED
+        - name: AWS_ENDPOINT_URL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: AWS_ENDPOINT_URL
+        - name: MLFLOW_S3_ENDPOINT_URL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: MLFLOW_S3_ENDPOINT_URL
+        - name: DVC_S3_ENDPOINT_URL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: DVC_S3_ENDPOINT_URL
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: AWS_SECRET_ACCESS_KEY
+        - name: AWS_DEFAULT_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: AWS_DEFAULT_REGION
+        volumeMounts:
+        - name: webapp-models
+          mountPath: /app/models
+        - name: webapp-data
+          mountPath: /app/data
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 5
+      volumes:
+      - name: webapp-models
+        persistentVolumeClaim:
+          claimName: webapp-models
+      - name: webapp-data
+        persistentVolumeClaim:
+          claimName: webapp-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp
+  namespace: ml-team
+spec:
+  selector:
+    app: webapp
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
+  type: ClusterIP
