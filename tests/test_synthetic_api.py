@@ -8,10 +8,10 @@ pytest.importorskip("httpx")
 
 from httpx import ASGITransport, AsyncClient
 
-from drift.synthetic_api.app import create_app
-from drift.synthetic_api.config import SyntheticApiSettings
-from drift.synthetic_api.schemas import GeneratorRequest
-from drift.synthetic_api.runtimes import (
+from drift_v2.synthetic_api.app import create_app
+from drift_v2.synthetic_api.config import SyntheticApiSettings
+from drift_v2.synthetic_api.schemas import GeneratorRequest
+from drift_v2.synthetic_api.runtimes import (
     LlamaCppRuntime,
     MockLlmRuntime,
     RuntimeErrorWithContext,

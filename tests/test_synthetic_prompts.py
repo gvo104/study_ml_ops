@@ -1,12 +1,12 @@
 import pytest
 
-from drift.synthetic_api.prompts import (
+from drift_v2.synthetic_api.prompts import (
     build_expert_system_prompt,
     build_expert_user_prompt,
     build_generator_system_prompt,
     build_generator_user_prompt,
 )
-from drift.synthetic_api.schemas import ExpertRequest, GeneratorRequest
+from drift_v2.synthetic_api.schemas import ExpertRequest, GeneratorRequest
 
 
 def test_generator_prompt_is_composed_from_role_and_guides():

@@ -1,0 +1,28 @@
+Task: generate one patient message in JSON.
+
+Target label: {target_label}
+Phase: {phase}
+Length: {length}
+Style: {style}
+
+Phase guide:
+{phase_guide}
+
+Status guide:
+{status_guide}
+
+Label boundary guide:
+{boundary_guide}
+
+Requirements:
+- Write only the patient message text, not advice and not a diagnosis.
+- Match the target label clearly but naturally.
+- Include 2-4 clear anchors for the target label.
+- Avoid phrases that point more strongly to another label.
+- For phase A, use direct baseline-like clinical wording and common anchors.
+- For phase B, preserve the same condition but change wording, vocabulary, phrasing, and style.
+- For phase C, use baseline-like wording; do not mention that class frequencies changed.
+- For phase D, use marker words such as fine, calm, productive, or busy in context-dependent ways where surrounding symptoms determine the label.
+- Keep the wording realistic and short enough for ordinary user input.
+- Return keys exactly: role, text, target_label, phase.
+- Use role="generator", target_label="{target_label}", phase="{phase}".
