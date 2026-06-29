@@ -42,8 +42,8 @@ spec:
         env:
         - name: MINIO_ROOT_USER
           valueFrom:
-            configMapKeyRef:
-              name: minio-config
+            secretKeyRef:
+              name: minio-secret
               key: MINIO_ROOT_USER
         - name: MINIO_ROOT_PASSWORD
           valueFrom:
@@ -82,7 +82,9 @@ spec:
   - name: s3-api
     port: 9000
     targetPort: 9000
+    nodePort: 30900
   - name: console
     port: 9001
     targetPort: 9001
-  type: ClusterIP
+    nodePort: 30901
+  type: NodePort

@@ -1,4 +1,4 @@
-.PHONY: clean data environment lint requirements train predict test serve experiments dvc-repro dvc-pull sync_data_to_s3 sync_data_from_s3
+.PHONY: clean data environment lint requirements train predict test serve experiments dvc-repro dvc-pull sync_data_to_s3 sync_data_from_s3 k8s-forward
 
 #################################################################################
 # GLOBALS                                                                       #
@@ -193,3 +193,7 @@ infra-status:
 ## View MLflow logs
 infra-logs:
 	docker compose logs -f mlflow
+
+## Forward Kubernetes services to localhost:9000, localhost:5000 and localhost:8000
+k8s-forward:
+	./scripts/k8s-port-forward.sh

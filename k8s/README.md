@@ -69,11 +69,27 @@ kubectl apply -k k8s/base/
 
 # Check status
 kubectl get pods -n ml-team
+kubectl get svc -n ml-team
 
-# Access services
-kubectl port-forward -n ml-team svc/webapp 8000:8000
+# Access services through NodePort on a local cluster node
+# Docker Desktop / k3d with host port mappings:
+#   Webapp:        http://localhost:30080
+#   MLflow UI:     http://localhost:30500
+#   MinIO Console: http://localhost:30901
+#
+# minikube:
+minikube service -n ml-team webapp
+minikube service -n ml-team mlflow
+minikube service -n ml-team minio --url
+
+# Or use port-forward if NodePort is not reachable from your environment.
+# This exposes services on the same localhost ports as docker compose.
+make k8s-forward
+
+# Equivalent manual commands:
+kubectl port-forward -n ml-team svc/minio 9000:9000
 kubectl port-forward -n ml-team svc/mlflow 5000:5000
-kubectl port-forward -n ml-team svc/minio 9001:9001
+kubectl port-forward -n ml-team svc/webapp 8000:8000
 ```
 
 ### Using Kustomize
@@ -108,8 +124,8 @@ Argo CD will automatically sync and update the cluster.
 
 | Port  | Service    | Description          |
 |-------|------------|----------------------|
-| 9000  | S3 API     | Object storage API   |
-| 9001  | Console    | Web UI for MinIO     |
+| 9000 / NodePort 30900 | S3 API | Object storage API |
+| 9001 / NodePort 30901 | Console | Web UI for MinIO |
 
 **Credentials:**
 - Username: `minioadmin`
@@ -119,7 +135,7 @@ Argo CD will automatically sync and update the cluster.
 
 | Port | Service | Description      |
 |------|---------|------------------|
-| 5000 | Server  | MLflow tracking  |
+| 5000 / NodePort 30500 | Server | MLflow tracking |
 
 **Environment:**
 - Backend: SQLite (local) or S3 (via MinIO)
@@ -129,7 +145,7 @@ Argo CD will automatically sync and update the cluster.
 
 | Port | Service | Description |
 |------|---------|-------------|
-| 8000 | HTTP    | FastAPI UI and prediction API |
+| 8000 / NodePort 30080 | HTTP | FastAPI UI and prediction API |
 
 **Environment:**
 - `MLFLOW_TRACKING_URI`: `http://mlflow:5000`
