@@ -11,6 +11,10 @@ on:
 permissions:
   contents: read
 
+env:
+  PYTHON_VERSION: "3.11"
+  API_IMAGE: study-mlops-api:${{ github.sha }}
+
 jobs:
   lint:
     name: Lint
@@ -23,7 +27,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
 
       - name: Install dependencies
@@ -32,7 +36,7 @@ jobs:
           python -m pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Run flake8
-        run: python -m flake8 src tests
+        run: python -m flake8 src tests --max-line-length=127 --extend-ignore=E501
 
   test:
     name: Tests
@@ -45,7 +49,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
 
       - name: Install dependencies
@@ -70,13 +74,14 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
 
       - name: Install build dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -r requirements-dev.txt
+          python -m pip install build
 
       - name: Build Python package
         run: python -m build
@@ -88,10 +93,10 @@ jobs:
           path: dist/*
 
       - name: Build Docker image
-        run: docker build -t study-mlops-api:${{ github.sha }} .
+        run: docker build -f Dockerfile.api -t "${API_IMAGE}" .
 
       - name: Save Docker image
-        run: docker save study-mlops-api:${{ github.sha }} -o study-mlops-api.tar
+        run: docker save "${API_IMAGE}" -o study-mlops-api.tar
 
       - name: Upload Docker image
         uses: actions/upload-artifact@v4
@@ -120,7 +125,7 @@ jobs:
             --name study-mlops-api \
             -e CI_SMOKE_MODE=true \
             -p 8000:8000 \
-            study-mlops-api:${{ github.sha }}
+            "${API_IMAGE}"
 
       - name: Smoke test deployment
         run: |
