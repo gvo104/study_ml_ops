@@ -1,1 +1,0 @@
-"""Synthetic drift monitoring runner."""

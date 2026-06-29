@@ -1,1 +1,0 @@
-"""Online synthetic demo workers."""

@@ -131,9 +131,8 @@ study_ml_ops/models/
 study_ml_ops/reports/figures/
 PROJECT_CONTEXT.md
 
-drift/models
-drift/reference/
-drift/replay/messages.generated.jsonl
+drift_v2/models
+drift_v2/reference/
 reference/
-drift/artifacts/
+drift_v2/artifacts/
 reports

@@ -25,12 +25,9 @@ src
 src.egg-info
 tests
 
-drift/artifacts
-drift/docs
-drift/models
-drift/reference
-drift/runner
-drift/synthetic_api
+drift_v2/artifacts
+drift_v2/models
+drift_v2/reference
 
 docker-compose.yml
 docker-compose.monitoring.yml

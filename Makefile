@@ -1,4 +1,4 @@
-.PHONY: clean data environment lint requirements train predict test test-synthetic test-drift test-monitoring serve serve-synthetic serve-drift-exporter run-drift-debug run-drift-full run-replay-demo generate-phase-demo-data compute-demo-metrics run-online-traffic run-expert-batch export-training-candidates experiments dvc-repro dvc-pull sync_data_to_s3 sync_data_from_s3 monitoring-up monitoring-down monitoring-restart monitoring-status
+.PHONY: clean data environment lint requirements train predict test test-synthetic test-monitoring-v2 serve serve-synthetic serve-drift-v2-exporter run-drift-v2-offline-demo run-drift-v2-online-demo drift-v2-online-seed-baseline drift-v2-online-tick show-drift-v2-online-progress experiments dvc-repro dvc-pull sync_data_to_s3 sync_data_from_s3 monitoring-up monitoring-down monitoring-restart monitoring-status monitoring-grafana-refresh run-drift-v2-clean-start restart-drift-v2-online-monitoring
 
 #################################################################################
 # GLOBALS                                                                       #
@@ -50,13 +50,9 @@ test:
 test-synthetic:
 	$(PYTHON_INTERPRETER) -m pytest tests/test_synthetic_api.py -q
 
-## Run legacy/shared drift-runner tests
-test-drift:
-	$(PYTHON_INTERPRETER) -m pytest tests/test_drift_runner.py -q
-
-## Run only drift monitoring exporter tests
-test-monitoring:
-	$(PYTHON_INTERPRETER) -m pytest tests/test_drift_monitoring.py -q
+## Run drift_v2 monitoring/exporter tests
+test-monitoring-v2:
+	$(PYTHON_INTERPRETER) -m pytest tests/test_drift_v2_groundwork.py tests/test_drift_v2_monitoring.py -q
 
 ## Start FastAPI inference server
 serve:
@@ -64,47 +60,55 @@ serve:
 
 ## Start synthetic FastAPI service for generator/expert roles
 serve-synthetic:
-	$(PYTHON_INTERPRETER) -m uvicorn drift.synthetic_api.app:app --reload --host $${SYNTHETIC_API_HOST:-0.0.0.0} --port $${SYNTHETIC_API_PORT:-8001}
+	$(PYTHON_INTERPRETER) -m uvicorn drift_v2.synthetic_api.app:app --reload --host $${SYNTHETIC_API_HOST:-0.0.0.0} --port $${SYNTHETIC_API_PORT:-8001}
 
-## Start drift Prometheus exporter locally
-serve-drift-exporter:
-	$(PYTHON_INTERPRETER) -m uvicorn drift.monitoring.app:app --reload --host $${DRIFT_EXPORTER_HOST:-0.0.0.0} --port $${DRIFT_EXPORTER_PORT:-9108}
-
-## Run legacy batch drift-runner in debug mode
-run-drift-debug:
-	$(PYTHON_INTERPRETER) -m drift.runner.cli run --config drift/configs/runner.yaml --mode debug
-
-## Run legacy batch drift-runner in full mode
-run-drift-full:
-	$(PYTHON_INTERPRETER) -m drift.runner.cli run --config drift/configs/runner.yaml --mode full
+## Start clean drift_v2 Prometheus exporter locally
+serve-drift-v2-exporter:
+	$(PYTHON_INTERPRETER) -m uvicorn drift_v2.monitoring.app:app --reload --host $${DRIFT_V2_EXPORTER_HOST:-0.0.0.0} --port $${DRIFT_V2_EXPORTER_PORT:-9208}
 
 #################################################################################
 # DRIFT DEMO PIPELINE                                                           #
 #################################################################################
 
-## Replay pre-generated demo traffic into SQLite event store
-run-replay-demo:
-	$(PYTHON_INTERPRETER) -m drift.replay.worker --dataset $${DRIFT_REPLAY_DATASET:-drift/replay/messages.jsonl} --db-path $${DRIFT_EVENTS_DB:-drift/artifacts/demo/events.sqlite} --config drift/configs/runner.yaml --mode $${DRIFT_MODE:-debug} --interval-seconds $${DRIFT_REPLAY_INTERVAL_SECONDS:-1}
+## Run clean drift_v2 offline replay from immutable SQLite events
+run-drift-v2-offline-demo:
+	$(PYTHON_INTERPRETER) -m drift_v2.cli offline --db-path $${DRIFT_EVENTS_DB:-drift_v2/artifacts/demo/events.sqlite} --config drift_v2/configs/runner.yaml --mode $${DRIFT_MODE:-debug} --run-id $${DRIFT_V2_RUN_ID:-offline_demo_live_v2} --output-root $${DRIFT_V2_OUTPUT_ROOT:-drift_v2/artifacts/runs} --event-span $${DRIFT_V2_EVENT_SPAN:-40} --window-size $${DRIFT_V2_WINDOW_SIZE:-20} --step-size $${DRIFT_V2_STEP_SIZE:-20} --batch-size $${DRIFT_V2_BATCH_SIZE:-20} --interval-seconds $${DRIFT_V2_INTERVAL_SECONDS:-15} --max-ticks $${DRIFT_V2_MAX_TICKS:-0}
 
-## Generate phased LLM synthetic demo data and save replay cache
-generate-phase-demo-data:
-	$(PYTHON_INTERPRETER) -m drift.demo.phase_worker --db-path $${DRIFT_EVENTS_DB:-drift/artifacts/demo/events.sqlite} --config drift/configs/runner.yaml --mode $${DRIFT_MODE:-debug} --interval-seconds $${DRIFT_PHASE_INTERVAL_SECONDS:-0} --replay-output $${DRIFT_GENERATED_REPLAY_DATASET:-drift/replay/messages.generated.jsonl}
+## Run clean drift_v2 online loop with synthetic traffic and expert labeling
+run-drift-v2-online-demo:
+	$(PYTHON_INTERPRETER) -m drift_v2.cli online --db-path $${DRIFT_EVENTS_DB:-drift_v2/artifacts/demo/events.sqlite} --config drift_v2/configs/runner.yaml --mode $${DRIFT_MODE:-debug} --run-id $${DRIFT_V2_ONLINE_RUN_ID:-online_demo_live_v2} --output-root $${DRIFT_V2_OUTPUT_ROOT:-drift_v2/artifacts/runs} --source-mode $${DRIFT_V2_ONLINE_SOURCE_MODE:-online_synthetic_v2} --event-span $${DRIFT_V2_EVENT_SPAN:-40} --window-size $${DRIFT_V2_WINDOW_SIZE:-20} --step-size $${DRIFT_V2_STEP_SIZE:-20} --traffic-count $${DRIFT_V2_ONLINE_COUNT:-20} --expert-batch-size $${DRIFT_V2_EXPERT_BATCH_SIZE:-20} --lookback-minutes $${DRIFT_V2_EXPERT_LOOKBACK_MINUTES:-1440} --hidden-phase $${DRIFT_V2_HIDDEN_PHASE:-A_baseline} --interval-seconds $${DRIFT_V2_INTERVAL_SECONDS:-15} --max-ticks $${DRIFT_V2_MAX_TICKS:-0}
 
-## Compute demo drift metrics from SQLite event store into JSON artifacts
-compute-demo-metrics:
-	$(PYTHON_INTERPRETER) -m drift.demo.metrics_worker compute --db-path $${DRIFT_EVENTS_DB:-drift/artifacts/demo/events.sqlite} --config drift/configs/runner.yaml --mode $${DRIFT_MODE:-debug} --window-size $${DRIFT_DEMO_WINDOW_SIZE:-20} --step-size $${DRIFT_DEMO_STEP_SIZE:-20} --output-root $${DRIFT_DEMO_OUTPUT_ROOT:-drift/artifacts/demo/runs}
+## Seed one baseline batch for clean drift_v2 online mode
+drift-v2-online-seed-baseline:
+	DRIFT_V2_HIDDEN_PHASE=A_baseline DRIFT_V2_ONLINE_COUNT=$${DRIFT_V2_ONLINE_BASELINE_COUNT:-40} DRIFT_V2_EXPERT_BATCH_SIZE=$${DRIFT_V2_ONLINE_BASELINE_EXPERT_BATCH_SIZE:-40} DRIFT_V2_EXPERT_LOOKBACK_MINUTES=$${DRIFT_V2_EXPERT_LOOKBACK_MINUTES:-1440} DRIFT_V2_MAX_TICKS=1 $(MAKE) run-drift-v2-online-demo
 
-## Generate online synthetic traffic and save classifier responses to SQLite
-run-online-traffic:
-	$(PYTHON_INTERPRETER) -m drift.online.traffic_worker --db-path $${DRIFT_EVENTS_DB:-drift/artifacts/demo/events.sqlite} --config drift/configs/runner.yaml --mode $${DRIFT_MODE:-debug} --count $${DRIFT_ONLINE_COUNT:-10} --interval-seconds $${DRIFT_ONLINE_INTERVAL_SECONDS:-1} --hidden-phase $${DRIFT_HIDDEN_PHASE:-normal}
+## Run one clean drift_v2 online tick for the current hidden phase
+drift-v2-online-tick:
+	DRIFT_V2_MAX_TICKS=1 $(MAKE) run-drift-v2-online-demo
 
-## Label a random batch of unlabeled online events with synthetic expert
-run-expert-batch:
-	$(PYTHON_INTERPRETER) -m drift.online.expert_worker --db-path $${DRIFT_EVENTS_DB:-drift/artifacts/demo/events.sqlite} --config drift/configs/runner.yaml --mode $${DRIFT_MODE:-debug} --batch-size $${DRIFT_EXPERT_BATCH_SIZE:-10} --lookback-minutes $${DRIFT_EXPERT_LOOKBACK_MINUTES:-30}
+## Force recreate only Grafana for dashboard refresh
+monitoring-grafana-refresh:
+	docker compose -f docker-compose.monitoring.yml up -d --build --force-recreate grafana
 
-## Export labeled critical-window events for future retraining
-export-training-candidates:
-	$(PYTHON_INTERPRETER) -m drift.demo.metrics_worker export-candidates --db-path $${DRIFT_EVENTS_DB:-drift/artifacts/demo/events.sqlite} --output $${DRIFT_TRAINING_CANDIDATES:-drift/artifacts/demo/training_candidates.csv}
+## Recreate Grafana, stop old clean replay, refresh monitoring stack, and start infinite clean drift_v2 demo loop
+run-drift-v2-clean-start:
+	docker compose -f docker-compose.monitoring.yml up -d --build --force-recreate grafana
+	-pkill -f 'python3 -m drift_v2.cli offline --db-path drift_v2/artifacts/demo/events.sqlite'
+	docker compose -f docker-compose.monitoring.yml up -d --build
+	DRIFT_V2_BATCH_SIZE=20 DRIFT_V2_INTERVAL_SECONDS=5 DRIFT_V2_MAX_TICKS=0 $(MAKE) run-drift-v2-offline-demo
+
+## Alias for full clean drift_v2 online monitoring restart
+restart-drift-v2-online-monitoring:
+	docker compose -f docker-compose.monitoring.yml up -d --build --force-recreate grafana
+	-pkill -f 'python3 -m drift_v2.cli online --db-path drift_v2/artifacts/demo/events.sqlite'
+	docker compose -f docker-compose.monitoring.yml up -d --build
+	DRIFT_V2_INTERVAL_SECONDS=5 DRIFT_V2_MAX_TICKS=0 DRIFT_V2_ONLINE_COUNT=20 DRIFT_V2_EXPERT_BATCH_SIZE=20 $(MAKE) run-drift-v2-online-demo
+
+## Show clean drift_v2 online event counts from SQLite
+show-drift-v2-online-progress:
+	@if [ ! -f "$${DRIFT_EVENTS_DB:-drift_v2/artifacts/demo/events.sqlite}" ]; then echo "No events DB found"; exit 0; fi
+	@sqlite3 -header -column "$${DRIFT_EVENTS_DB:-drift_v2/artifacts/demo/events.sqlite}" "select count(*) as total, coalesce(sum(case when expert_label is not null then 1 else 0 end), 0) as labeled, coalesce(sum(case when expert_label is null then 1 else 0 end), 0) as unlabeled, max(created_at) as last_event_at from prediction_events where source_mode = '$${DRIFT_V2_ONLINE_SOURCE_MODE:-online_synthetic_v2}_$${DRIFT_V2_ONLINE_RUN_ID:-online_demo_live_v2}';"
+	@sqlite3 -header -column "$${DRIFT_EVENTS_DB:-drift_v2/artifacts/demo/events.sqlite}" "select hidden_phase, count(*) as total, sum(case when expert_label is not null then 1 else 0 end) as labeled from prediction_events where source_mode = '$${DRIFT_V2_ONLINE_SOURCE_MODE:-online_synthetic_v2}_$${DRIFT_V2_ONLINE_RUN_ID:-online_demo_live_v2}' group by hidden_phase order by min(id);"
 
 ## Reproduce DVC pipeline (prepare + train)
 dvc-repro:
@@ -250,15 +254,15 @@ infra-status:
 infra-logs:
 	docker compose logs -f mlflow
 
-## Start Prometheus + Grafana + drift exporter
+## Start Prometheus + Grafana + drift_v2 exporter
 monitoring-up:
 	docker compose -f docker-compose.monitoring.yml up -d --build --force-recreate
 
-## Stop Prometheus + Grafana + drift exporter
+## Stop Prometheus + Grafana + drift_v2 exporter
 monitoring-down:
 	docker compose -f docker-compose.monitoring.yml down
 
-## Restart Prometheus + Grafana + drift exporter with rebuild/recreate
+## Restart Prometheus + Grafana + drift_v2 exporter with rebuild/recreate
 monitoring-restart:
 	docker compose -f docker-compose.monitoring.yml down
 	docker compose -f docker-compose.monitoring.yml up -d --build --force-recreate
