@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 
+from src.api.bootstrap import ensure_dataset, model_available
 from src.api.dashboard import DashboardState
 from src.config import DEFAULT_CONFIG_PATH
 from src.models.registry import load_predictor
@@ -21,9 +22,41 @@ _dashboard = DashboardState()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    reload_predictor()
+    initialize_runtime()
     yield
     clear_runtime()
+
+
+def initialize_runtime():
+    global _startup_error
+
+    dataset_ready, dataset_message = ensure_dataset()
+    reload_predictor()
+
+    if _predictor is not None:
+        if not dataset_ready:
+            _startup_error = dataset_message
+        return
+
+    if model_available():
+        return
+
+    if dataset_ready:
+        _startup_error = (
+            "Model artifacts were not found. Automatic bootstrap training has "
+            "started in the background."
+        )
+        started = _dashboard.trigger_retraining(
+            reload_predictor,
+            reason="Bootstrapping model artifacts for the web UI.",
+        )
+        if not started:
+            _startup_error = "Model bootstrap is already in progress."
+    else:
+        _startup_error = (
+            "Model artifacts are not available yet, and the training dataset "
+            f"could not be prepared. {dataset_message}"
+        )
 
 
 def reload_predictor():
@@ -31,7 +64,7 @@ def reload_predictor():
     try:
         _predictor = load_predictor()
         _startup_error = None
-    except FileNotFoundError as exc:
+    except FileNotFoundError:
         _predictor = None
         _startup_error = (
             "Model artifacts are not available yet. Train the model or mount "

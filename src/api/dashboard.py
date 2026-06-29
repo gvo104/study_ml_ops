@@ -7,6 +7,7 @@ from pathlib import Path
 from threading import Lock, Thread
 from typing import Any, Callable
 
+from src.api.bootstrap import ensure_dataset
 from src.config import DATA_PATH, DEFAULT_CONFIG_PATH, MLFLOW_TRACKING_URI
 from src.config_loader import load_config
 from src.models.tracking import is_mlflow_available
@@ -211,6 +212,7 @@ class DashboardState:
         reload_predictor: Callable[[], Any],
         config_path: Path = DEFAULT_CONFIG_PATH,
         data_path: Path = DATA_PATH,
+        reason: str | None = None,
     ) -> bool:
         with self.lock:
             if self.retraining.state == "running":
@@ -219,7 +221,7 @@ class DashboardState:
             self.retraining = RetrainingStatus(
                 state="running",
                 started_at=_utc_now().isoformat(),
-                message="Retraining is running in the background.",
+                message=reason or "Retraining is running in the background.",
             )
 
         thread = Thread(
@@ -237,6 +239,10 @@ class DashboardState:
         data_path: Path,
     ) -> None:
         try:
+            dataset_ready, dataset_message = ensure_dataset(data_path)
+            if not dataset_ready:
+                raise RuntimeError(dataset_message)
+
             config = load_config(config_path)
             run_name = config.experiment.run_name or Path(config_path).stem
             result = train(
@@ -250,7 +256,10 @@ class DashboardState:
                     state="completed",
                     started_at=self.retraining.started_at,
                     completed_at=_utc_now().isoformat(),
-                    message="Retraining completed successfully and the model was reloaded.",
+                    message=(
+                        "Retraining completed successfully and the model was "
+                        f"reloaded. {dataset_message}"
+                    ),
                     last_run_name=run_name,
                     last_accuracy=result.accuracy,
                     last_macro_f1=result.macro_f1,

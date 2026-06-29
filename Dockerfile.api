@@ -8,6 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY requirements.txt setup.py ./
+COPY .dvc ./.dvc
+COPY .dvcignore dvc.yaml ./
 COPY src ./src
 COPY configs ./configs
 COPY models ./models
