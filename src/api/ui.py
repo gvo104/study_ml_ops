@@ -218,6 +218,11 @@ BASE_STYLES = """
     color: var(--muted);
   }
 
+  .mono {
+    font-family: Consolas, Menlo, Monaco, monospace;
+    font-size: 13px;
+  }
+
   .inline {
     display: flex;
     gap: 12px;
@@ -268,6 +273,13 @@ def _layout(title: str, active: str, content: str, script: str) -> str:
   </div>
   <script>
     const formatTs = (value) => value ? new Date(value).toLocaleString() : "-";
+    const formatMlflowTs = (value) => value ? new Date(value).toLocaleString() : "-";
+    const escapeHtml = (value) => String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
     {script}
   </script>
 </body>
@@ -342,7 +354,7 @@ def render_inference_page() -> str:
       if (!flags.length) {
         return '<span class="badge">normal</span>';
       }
-      return flags.map((flag) => `<span class="badge warn">${flag}</span>`).join("");
+      return flags.map((flag) => `<span class="badge warn">${escapeHtml(flag)}</span>`).join("");
     };
 
     const renderSummary = (payload) => {
@@ -353,7 +365,7 @@ def render_inference_page() -> str:
         driftList.innerHTML = notifications.map((item) => `
           <div class="notice ${item.level === "high" ? "high" : ""}">
             <strong>${item.level.toUpperCase()}</strong><br />
-            ${item.message}
+            ${escapeHtml(item.message)}
           </div>
         `).join("");
       }
@@ -367,8 +379,8 @@ def render_inference_page() -> str:
       predictionsBody.innerHTML = rows.map((row) => `
         <tr>
           <td>${formatTs(row.timestamp)}</td>
-          <td>${row.text_preview}</td>
-          <td>${row.prediction}</td>
+          <td>${escapeHtml(row.text_preview)}</td>
+          <td>${escapeHtml(row.prediction)}</td>
           <td>${(row.confidence * 100).toFixed(1)}%</td>
           <td><div class="badges">${renderFlags(row.anomaly_flags)}</div></td>
         </tr>
@@ -407,13 +419,13 @@ def render_inference_page() -> str:
       predictStatus.textContent = "Done.";
       const probabilities = Object.entries(payload.probabilities)
         .sort((a, b) => b[1] - a[1])
-        .map(([label, value]) => `<div>${label}: ${(value * 100).toFixed(1)}%</div>`)
+        .map(([label, value]) => `<div>${escapeHtml(label)}: ${(value * 100).toFixed(1)}%</div>`)
         .join("");
 
       predictionResult.innerHTML = `
         <div class="metric">
           <span class="muted">Predicted label</span>
-          <strong>${payload.prediction}</strong>
+          <strong>${escapeHtml(payload.prediction)}</strong>
         </div>
         <div class="metric">
           <span class="muted">Confidence</span>
@@ -467,7 +479,25 @@ def render_experiments_page() -> str:
       </div>
 
       <div class="panel">
-        <h3>Experiment catalog</h3>
+        <h3>MLflow runs</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Run name</th>
+              <th>Status</th>
+              <th>Started</th>
+              <th>Metrics</th>
+              <th>Params</th>
+            </tr>
+          </thead>
+          <tbody id="runs-body">
+            <tr><td colspan="5" class="muted">Loading MLflow runs...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="panel">
+        <h3>Experiment configs</h3>
         <table>
           <thead>
             <tr>
@@ -475,11 +505,10 @@ def render_experiments_page() -> str:
               <th>Config</th>
               <th>Model</th>
               <th>Features</th>
-              <th>Notes</th>
             </tr>
           </thead>
-          <tbody id="experiments-body">
-            <tr><td colspan="5" class="muted">Loading experiments...</td></tr>
+          <tbody id="configs-body">
+            <tr><td colspan="4" class="muted">Loading configs...</td></tr>
           </tbody>
         </table>
       </div>
@@ -490,7 +519,8 @@ def render_experiments_page() -> str:
     const retrainBtn = document.getElementById("retrain-btn");
     const activeModel = document.getElementById("active-model");
     const retrainingStatus = document.getElementById("retraining-status");
-    const experimentsBody = document.getElementById("experiments-body");
+    const runsBody = document.getElementById("runs-body");
+    const configsBody = document.getElementById("configs-body");
     const experimentDrift = document.getElementById("experiment-drift");
 
     const renderNotifications = (items) => {
@@ -502,9 +532,25 @@ def render_experiments_page() -> str:
       experimentDrift.innerHTML = items.map((item) => `
         <div class="notice ${item.level === "high" ? "high" : ""}">
           <strong>${item.level.toUpperCase()}</strong><br />
-          ${item.message}
+          ${escapeHtml(item.message)}
         </div>
       `).join("");
+    };
+
+    const formatMetric = (metrics, name) => {
+      const value = metrics?.[name];
+      if (value === undefined || value === null) {
+        return "-";
+      }
+      return (Number(value) * 100).toFixed(1) + "%";
+    };
+
+    const renderRunParams = (params) => {
+      const keys = ["model.name", "features.tfidf_max_features", "features.svd_components", "training.oversample"];
+      const visible = keys
+        .filter((key) => params?.[key] !== undefined)
+        .map((key) => `${escapeHtml(key)}=${escapeHtml(params[key])}`);
+      return visible.length ? visible.join("<br />") : "-";
     };
 
     const loadExperiments = async () => {
@@ -514,17 +560,26 @@ def render_experiments_page() -> str:
       const modelStatus = payload.model_loaded ? "loaded" : "not loaded";
       activeModel.innerHTML = `
         <div><span class="muted">Model status</span><br /><strong>${modelStatus}</strong></div>
-        <div><span class="muted">Feature schema</span><br /><strong>${payload.active_model.feature_schema_version || "-"}</strong></div>
+        <div><span class="muted">Feature schema</span><br /><strong>${escapeHtml(payload.active_model.feature_schema_version || "-")}</strong></div>
         <div><span class="muted">Accuracy</span><br /><strong>${payload.active_model.accuracy ? (payload.active_model.accuracy * 100).toFixed(1) + "%" : "-"}</strong></div>
         <div><span class="muted">Macro F1</span><br /><strong>${payload.active_model.macro_f1 ? (payload.active_model.macro_f1 * 100).toFixed(1) + "%" : "-"}</strong></div>
-        <div><span class="muted">Created</span><br /><strong>${payload.active_model.created_at || "-"}</strong></div>
-        <div><span class="muted">MLflow</span><br /><strong>${payload.tracking.enabled ? "connected" : "offline"}</strong></div>
+        <div><span class="muted">Created</span><br /><strong>${escapeHtml(payload.active_model.created_at || "-")}</strong></div>
+        <div><span class="muted">MLflow</span><br /><strong>${payload.tracking.connected ? "connected" : "offline"}</strong></div>
+        <div><span class="muted">Tracking URI</span><br /><span class="mono">${escapeHtml(payload.tracking.uri || "-")}</span></div>
       `;
       if (payload.startup_error) {
         activeModel.innerHTML += `
           <div class="notice high">
             <strong>Startup note</strong><br />
-            ${payload.startup_error}
+            ${escapeHtml(payload.startup_error)}
+          </div>
+        `;
+      }
+      if (payload.tracking.error) {
+        activeModel.innerHTML += `
+          <div class="notice high">
+            <strong>MLflow note</strong><br />
+            ${escapeHtml(payload.tracking.error)}
           </div>
         `;
       }
@@ -532,23 +587,40 @@ def render_experiments_page() -> str:
       const retraining = payload.retraining;
       retrainingStatus.innerHTML = `
         <div><span class="muted">State</span><br /><strong>${retraining.state}</strong></div>
-        <div><span class="muted">Message</span><br /><span>${retraining.message}</span></div>
+        <div><span class="muted">Message</span><br /><span>${escapeHtml(retraining.message)}</span></div>
         <div><span class="muted">Started</span><br /><span>${formatTs(retraining.started_at)}</span></div>
         <div><span class="muted">Completed</span><br /><span>${formatTs(retraining.completed_at)}</span></div>
-        <div><span class="muted">Last run</span><br /><span>${retraining.last_run_name || "-"}</span></div>
+        <div><span class="muted">Last run</span><br /><span>${escapeHtml(retraining.last_run_name || "-")}</span></div>
       `;
       retrainBtn.disabled = retraining.state === "running";
 
       renderNotifications(payload.drift_notifications || []);
 
-      const rows = payload.experiment_configs || [];
-      experimentsBody.innerHTML = rows.map((row) => `
+      const runs = payload.mlflow_runs || [];
+      if (!runs.length) {
+        runsBody.innerHTML = `<tr><td colspan="5" class="muted">${payload.tracking.connected ? "No MLflow runs yet." : "MLflow is offline or unreachable."}</td></tr>`;
+      } else {
+        runsBody.innerHTML = runs.map((row) => `
+          <tr>
+            <td>
+              <strong>${escapeHtml(row.run_name)}</strong><br />
+              <span class="muted mono">${escapeHtml(row.run_id)}</span>
+            </td>
+            <td>${escapeHtml(row.status)}</td>
+            <td>${formatMlflowTs(row.start_time)}</td>
+            <td>accuracy=${formatMetric(row.metrics, "accuracy")}<br />macro_f1=${formatMetric(row.metrics, "macro_f1")}</td>
+            <td>${renderRunParams(row.params)}</td>
+          </tr>
+        `).join("");
+      }
+
+      const configs = payload.experiment_configs || [];
+      configsBody.innerHTML = configs.map((row) => `
         <tr>
-          <td>${row.name}</td>
-          <td>${row.config_path}</td>
-          <td>${row.model}</td>
-          <td>tfidf=${row.tfidf_max_features}, svd=${row.svd_components}, oversample=${row.oversample}</td>
-          <td>${row.description || "-"}</td>
+          <td>${escapeHtml(row.name)}</td>
+          <td class="mono">${escapeHtml(row.config_path)}</td>
+          <td>${escapeHtml(row.model)}</td>
+          <td>tfidf=${escapeHtml(row.tfidf_max_features)}, svd=${escapeHtml(row.svd_components)}, oversample=${escapeHtml(row.oversample)}</td>
         </tr>
       `).join("");
     };

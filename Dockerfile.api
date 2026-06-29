@@ -10,6 +10,7 @@ WORKDIR /app
 COPY requirements.txt setup.py ./
 COPY .dvc ./.dvc
 COPY .dvcignore dvc.yaml ./
+RUN printf "[core]\n    no_scm = true\n" > .dvc/config.local
 COPY src ./src
 COPY configs ./configs
 COPY models ./models

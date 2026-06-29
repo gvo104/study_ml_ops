@@ -5,6 +5,7 @@ pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient
 
 import src.api.app as api_app
+import src.api.dashboard as api_dashboard
 
 
 class DummyPredictor:
@@ -33,6 +34,39 @@ def client(monkeypatch):
         api_app,
         "ensure_dataset",
         lambda: (True, "Dataset is ready for the web UI."),
+    )
+    monkeypatch.setattr(
+        api_dashboard,
+        "list_mlflow_runs",
+        lambda: {
+            "enabled": True,
+            "connected": True,
+            "uri": "http://mlflow:5000",
+            "experiment_name": "mental_health_classification",
+            "error": None,
+            "experiments": [
+                {
+                    "experiment_id": "1",
+                    "name": "mental_health_classification",
+                    "lifecycle_stage": "active",
+                    "artifact_location": "s3://ml-team/mlflow-artifacts",
+                }
+            ],
+            "runs": [
+                {
+                    "run_id": "abc123",
+                    "experiment_id": "1",
+                    "run_name": "xgboost_baseline",
+                    "status": "FINISHED",
+                    "start_time": 1781500000000,
+                    "end_time": 1781500100000,
+                    "artifact_uri": "s3://ml-team/mlflow-artifacts/1/abc123/artifacts",
+                    "metrics": {"accuracy": 0.91, "macro_f1": 0.9},
+                    "params": {"model.name": "xgboost"},
+                    "tags": {"mlflow.runName": "xgboost_baseline"},
+                }
+            ],
+        },
     )
 
     api_app._dashboard.recent_predictions.clear()
@@ -88,6 +122,9 @@ def test_experiments_summary_contains_catalog(client):
     assert response.status_code == 200
     payload = response.json()
     assert payload["experiment_configs"]
+    assert payload["tracking"]["connected"] is True
+    assert payload["mlflow_runs"][0]["run_name"] == "xgboost_baseline"
+    assert payload["mlflow_experiments"][0]["name"] == "mental_health_classification"
     assert payload["active_model"]["feature_schema_version"] == "test-schema"
 
 

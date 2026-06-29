@@ -8,9 +8,9 @@ from threading import Lock, Thread
 from typing import Any, Callable
 
 from src.api.bootstrap import ensure_dataset
-from src.config import DATA_PATH, DEFAULT_CONFIG_PATH, MLFLOW_TRACKING_URI
+from src.config import DATA_PATH, DEFAULT_CONFIG_PATH
 from src.config_loader import load_config
-from src.models.tracking import is_mlflow_available
+from src.models.tracking import list_mlflow_runs
 from src.models.trainer import train
 
 
@@ -190,6 +190,7 @@ class DashboardState:
                 }
             )
 
+        tracking = list_mlflow_runs()
         with self.lock:
             return {
                 "retraining": asdict(self.retraining),
@@ -201,10 +202,9 @@ class DashboardState:
                 "model_loaded": predictor_metadata is not None,
                 "startup_error": startup_error,
                 "experiment_configs": configs,
-                "tracking": {
-                    "enabled": is_mlflow_available(),
-                    "uri": MLFLOW_TRACKING_URI,
-                },
+                "tracking": tracking,
+                "mlflow_runs": tracking["runs"],
+                "mlflow_experiments": tracking["experiments"],
             }
 
     def trigger_retraining(

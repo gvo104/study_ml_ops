@@ -30,6 +30,9 @@ async def lifespan(app: FastAPI):
 def initialize_runtime():
     global _startup_error
 
+    import nltk
+    nltk.download('punkt')
+
     dataset_ready, dataset_message = ensure_dataset()
     reload_predictor()
 
@@ -156,6 +159,5 @@ def retrain():
         status="started",
         message="Retraining has started in the background.",
     )
-
 
 app.state.configs_dir = DEFAULT_CONFIG_PATH.parent / "experiments"

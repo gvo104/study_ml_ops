@@ -46,6 +46,7 @@ services:
       AWS_ACCESS_KEY_ID: minioadmin
       AWS_SECRET_ACCESS_KEY: minioadmin
       AWS_DEFAULT_REGION: us-east-1
+      MLFLOW_SERVER_ALLOWED_HOSTS: localhost,127.0.0.1,mlflow,mlflow:5000
     volumes:
       - mlflow_data:/mlflow_data
     command: >
@@ -54,6 +55,8 @@ services:
         --default-artifact-root s3://ml-team/mlflow-artifacts
         --host 0.0.0.0
         --port 5000
+        --allowed-hosts localhost,127.0.0.1,mlflow,mlflow:5000
+        --disable-security-middleware
     depends_on:
       minio-init:
         condition: service_completed_successfully

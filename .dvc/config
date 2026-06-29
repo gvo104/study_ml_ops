@@ -1,6 +1,6 @@
 [core]
     remote = origin
-['remote "origin"']
+[remote "origin"]
     url = s3://ml-team/dvc-store
     endpointurl = http://localhost:9000
     access_key_id = minioadmin
