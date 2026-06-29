@@ -7,3 +7,4 @@ resources:
   - configmap.yml
   - minio.yml
   - mlflow.yml
+  - webapp.yml

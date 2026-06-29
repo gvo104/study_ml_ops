@@ -1,6 +1,6 @@
 # K8s Infrastructure (Equivalent to docker-compose)
 
-This directory contains Kubernetes manifests for deploying MLflow and MinIO services, similar to the existing `docker-compose.yml`.
+This directory contains Kubernetes manifests for deploying MinIO, MLflow and the API web application, similar to the existing `docker-compose.yml`.
 
 ## Architecture
 
@@ -15,6 +15,12 @@ This directory contains Kubernetes manifests for deploying MLflow and MinIO serv
          └────────────────▶│     MLflow       │
                            │ (Tracking Server)│
                            └──────────────────┘
+                                    ▲
+                                    |
+                           ┌──────────────────┐
+                           │      Webapp      │
+                           │   (FastAPI UI)   │
+                           └──────────────────┘
 ```
 
 ## Directory Structure
@@ -23,9 +29,9 @@ This directory contains Kubernetes manifests for deploying MLflow and MinIO serv
 k8s/
 ├── base/                    # Base Kubernetes manifests
 │   ├── configmap.yml       # Configuration values
-│   ├── secret.yml          # Sensitive data (secrets)
 │   ├── minio.yml           # MinIO deployment & service
-│   └── mlflow.yml          # MLflow deployment, init job & service
+│   ├── mlflow.yml          # MLflow deployment, init job & service
+│   └── webapp.yml          # API deployment & service
 └── overlays/               # Environment-specific configs (optional)
     ├── dev/                # Dev environment overrides
     └── production/         # Production environment overrides
@@ -35,7 +41,10 @@ k8s/
 
 - Kubernetes cluster (minikube, k3d, EKS, GKE, etc.)
 - `kubectl` installed and configured
-- Argo CD installed in your cluster
+- Docker images available in the cluster:
+  - `mlflow:latest` built from `Dockerfile.mlflow`
+  - `study-mlops-webapp:latest` built from `Dockerfile.api`
+- Argo CD installed in your cluster (optional)
 - kustomize (optional, for applying manifests)
 
 ## Quick Start
@@ -43,18 +52,28 @@ k8s/
 ### Using kubectl directly
 
 ```bash
-# Create namespace
-kubectl create namespace ml-team
+# Build local images used by the Kubernetes manifests
+docker build -f Dockerfile.mlflow -t mlflow:latest .
+docker build -f Dockerfile.api -t study-mlops-webapp:latest .
+
+# For kind, load images into the cluster
+kind load docker-image mlflow:latest --name ml-cluster
+kind load docker-image study-mlops-webapp:latest --name ml-cluster
+
+# For minikube, either build inside minikube's Docker daemon or load images:
+minikube image load mlflow:latest
+minikube image load study-mlops-webapp:latest
 
 # Apply all manifests
-kubectl apply -f k8s/base/
+kubectl apply -k k8s/base/
 
 # Check status
 kubectl get pods -n ml-team
 
 # Access services
-# MinIO Console: http://<kubernetes-ip>:31001 (or use Ingress)
-# MLflow UI: http://<kubernetes-ip>:31000 (or use Ingress)
+kubectl port-forward -n ml-team svc/webapp 8000:8000
+kubectl port-forward -n ml-team svc/mlflow 5000:5000
+kubectl port-forward -n ml-team svc/minio 9001:9001
 ```
 
 ### Using Kustomize
@@ -106,6 +125,17 @@ Argo CD will automatically sync and update the cluster.
 - Backend: SQLite (local) or S3 (via MinIO)
 - Artifact storage: `s3://ml-team/mlflow-artifacts` (MinIO)
 
+### Webapp API
+
+| Port | Service | Description |
+|------|---------|-------------|
+| 8000 | HTTP    | FastAPI UI and prediction API |
+
+**Environment:**
+- `MLFLOW_TRACKING_URI`: `http://mlflow:5000`
+- `MLFLOW_ENABLED`: `true`
+- S3/DVC/MLflow artifact endpoint: `http://minio:9000`
+
 ## Configuring Kubernetes Locally
 
 ### Using k3d (Recommended for development)
@@ -115,7 +145,7 @@ Argo CD will automatically sync and update the cluster.
 k3d cluster create ml-cluster --agents 1
 
 # Apply manifests
-kubectl apply -f k8s/base/
+kubectl apply -k k8s/base/
 
 # Get access to cluster
 k3d kubeconfig export ml-cluster
@@ -131,7 +161,7 @@ minikube start --memory 4096 --cpus 2
 minikube docker-env
 
 # Apply manifests
-kubectl apply -f k8s/base/
+kubectl apply -k k8s/base/
 
 # Exit Docker env
 exit
@@ -144,7 +174,7 @@ exit
 kind create cluster --name ml-cluster
 
 # Apply with Kubernetes YAML
-kubectl apply -f k8s/base/
+kubectl apply -k k8s/base/
 
 # Or using kustomize
 kustomize build k8s/base | kubectl apply -f -
@@ -233,12 +263,11 @@ The Kubernetes setup is designed to be equivalent to your existing `docker-compo
 | `ports`                  | `service.ports`     | ClusterIP services           |
 | `environment`            | `env` / `configmap` | ConfigMap for configs        |
 | `depends_on`             | Init Job           | minio-init Job before MLflow |
-| `volumes`                | `volumeMounts/volumes` | emptyDir volumes          |
+| `volumes`                | `PersistentVolumeClaim` | Persistent data for MinIO, MLflow, API models/data |
 
 ## Next Steps
 
 - Add Ingress Controller for external access
-- Configure persistent storage (PV/PVC) instead of emptyDir
 - Set up monitoring with Prometheus/Grafana
 - Add certificate management for HTTPS
 - Implement RBAC for role-based access control

@@ -1,3 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minio-data
+  namespace: ml-team
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -16,6 +28,12 @@ spec:
       containers:
       - name: minio
         image: minio/minio:latest
+        imagePullPolicy: IfNotPresent
+        args:
+        - server
+        - /data
+        - --console-address
+        - :9001
         ports:
         - containerPort: 9000
           name: s3-api
@@ -29,8 +47,8 @@ spec:
               key: MINIO_ROOT_USER
         - name: MINIO_ROOT_PASSWORD
           valueFrom:
-            configMapKeyRef:
-              name: minio-config
+            secretKeyRef:
+              name: minio-secret
               key: MINIO_ROOT_PASSWORD
         volumeMounts:
         - name: minio-data
@@ -49,7 +67,8 @@ spec:
           periodSeconds: 5
       volumes:
       - name: minio-data
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: minio-data
 ---
 apiVersion: v1
 kind: Service

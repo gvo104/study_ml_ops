@@ -1,10 +1,21 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mlflow-data
+  namespace: ml-team
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: minio-init
   namespace: ml-team
 spec:
-  ttlSecondsAfterFinished: 60
   backoffLimit: 1
   template:
     metadata:
@@ -15,25 +26,27 @@ spec:
       containers:
       - name: minio-init
         image: amazon/aws-cli:latest
+        imagePullPolicy: IfNotPresent
         env:
         - name: AWS_ACCESS_KEY_ID
           valueFrom:
-            configMapKeyRef:
-              name: minio-config
+            secretKeyRef:
+              name: minio-secret
               key: AWS_ACCESS_KEY_ID
         - name: AWS_SECRET_ACCESS_KEY
           valueFrom:
-            configMapKeyRef:
-              name: minio-config
+            secretKeyRef:
+              name: minio-secret
               key: AWS_SECRET_ACCESS_KEY
         command: ["/bin/sh", "-c"]
         args:
           - |
-            aws --endpoint-url http://minio:9000 s3 mb s3://ml-team || echo "Bucket already exists"
+            until aws --endpoint-url http://minio:9000 s3 ls >/dev/null 2>&1; do
+              echo "Waiting for MinIO..."
+              sleep 2
+            done
+            aws --endpoint-url http://minio:9000 s3 mb s3://ml-team || true
             echo "Bucket ml-team is ready"
-  selector:
-    matchLabels:
-      app: minio-init
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -50,9 +63,46 @@ spec:
       labels:
         app: mlflow
     spec:
+      initContainers:
+      - name: wait-for-minio-bucket
+        image: amazon/aws-cli:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-secret
+              key: AWS_SECRET_ACCESS_KEY
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            until aws --endpoint-url http://minio:9000 s3 ls s3://ml-team >/dev/null 2>&1; do
+              echo "Waiting for bucket ml-team..."
+              sleep 2
+            done
       containers:
       - name: mlflow
         image: mlflow:latest
+        imagePullPolicy: IfNotPresent
+        command: ["mlflow"]
+        args:
+        - server
+        - --backend-store-uri
+        - sqlite:////mlflow_data/mlflow.db
+        - --default-artifact-root
+        - s3://ml-team/mlflow-artifacts
+        - --host
+        - 0.0.0.0
+        - --port
+        - "5000"
+        - --allowed-hosts
+        - localhost,127.0.0.1,mlflow,mlflow:5000,mlflow.ml-team.svc,mlflow.ml-team.svc.cluster.local
+        - --disable-security-middleware
         ports:
         - containerPort: 5000
           name: server
@@ -64,19 +114,24 @@ spec:
               key: MLFLOW_S3_ENDPOINT_URL
         - name: AWS_ACCESS_KEY_ID
           valueFrom:
-            configMapKeyRef:
-              name: minio-config
+            secretKeyRef:
+              name: minio-secret
               key: AWS_ACCESS_KEY_ID
         - name: AWS_SECRET_ACCESS_KEY
           valueFrom:
-            configMapKeyRef:
-              name: minio-config
+            secretKeyRef:
+              name: minio-secret
               key: AWS_SECRET_ACCESS_KEY
         - name: AWS_DEFAULT_REGION
           valueFrom:
             configMapKeyRef:
-              name: minio-config
+              name: app-config
               key: AWS_DEFAULT_REGION
+        - name: MLFLOW_SERVER_ALLOWED_HOSTS
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: MLFLOW_SERVER_ALLOWED_HOSTS
         volumeMounts:
         - name: mlflow-data
           mountPath: /mlflow_data
@@ -94,7 +149,8 @@ spec:
           periodSeconds: 5
       volumes:
       - name: mlflow-data
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: mlflow-data
 ---
 apiVersion: v1
 kind: Service
