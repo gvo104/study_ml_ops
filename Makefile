@@ -226,3 +226,25 @@ monitoring-down:
 ## Show monitoring stack container status
 monitoring-status:
 	docker compose -f docker-compose.monitoring.yml ps
+## Forward Kubernetes services to localhost:9000, localhost:5000, localhost:8000 and Argo CD to localhost:8080
+k8s-forward:
+	./scripts/k8s-port-forward.sh
+
+## Install Argo CD into the current Kubernetes cluster
+argocd-install:
+	kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+	kubectl apply --server-side --force-conflicts -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+## Register the ml-team application in Argo CD
+argocd-app:
+	kubectl apply -k argocd/
+
+## Print the initial Argo CD admin password
+argocd-password:
+	kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath='{.data.password}' | base64 -d
+	@echo
+
+## Force sync and wait for the ml-team application
+argocd-sync:
+	argocd app sync ml-team-app
+	argocd app wait ml-team-app --health --sync --timeout 300

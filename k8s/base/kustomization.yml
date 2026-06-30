@@ -8,3 +8,5 @@ resources:
   - minio.yml
   - mlflow.yml
   - webapp.yml
+  - ml-team-project.yml
+  - ml-team-application.yml
