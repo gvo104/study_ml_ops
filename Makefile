@@ -194,7 +194,7 @@ infra-status:
 infra-logs:
 	docker compose logs -f mlflow
 
-## Forward Kubernetes services to localhost:9000, localhost:5000, localhost:8000 and Argo CD to localhost:8080
+## Forward Kubernetes app services to localhost:9000, localhost:5000 and localhost:8000
 k8s-forward:
 	./scripts/k8s-port-forward.sh
 

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 namespace="${K8S_NAMESPACE:-ml-team}"
-argocd_namespace="${ARGOCD_NAMESPACE:-argocd}"
+address="${KUBECTL_PORT_FORWARD_ADDRESS:-127.0.0.1}"
 
 pids=()
 
@@ -21,7 +21,7 @@ forward() {
   local service="$2"
   local mapping="$3"
 
-  kubectl port-forward -n "$namespace" "svc/${service}" "$mapping" &
+  kubectl port-forward --address "$address" -n "$namespace" "svc/${service}" "$mapping" &
   pids+=("$!")
 }
 
@@ -41,10 +41,9 @@ forward_if_available() {
 }
 
 echo "Forwarding Kubernetes services:"
-forward_if_available "$namespace" minio 9000:9000 "MinIO S3 API" "http://localhost:9000"
-forward_if_available "$namespace" mlflow 5000:5000 "MLflow UI" "http://localhost:5000"
-forward_if_available "$namespace" webapp 8000:8000 "Webapp" "http://localhost:8000"
-forward_if_available "$argocd_namespace" argocd-server 8080:443 "Argo CD UI" "https://localhost:8080"
+forward_if_available "$namespace" minio 9000:9000 "MinIO S3 API" "http://${address}:9000"
+forward_if_available "$namespace" mlflow 5000:5000 "MLflow UI" "http://${address}:5000"
+forward_if_available "$namespace" webapp 8000:8000 "Webapp" "http://${address}:8000"
 echo
 echo "Press Ctrl+C to stop port-forwarding."
 
