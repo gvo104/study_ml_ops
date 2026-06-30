@@ -30,9 +30,6 @@ async def lifespan(app: FastAPI):
 def initialize_runtime():
     global _startup_error
 
-    import nltk
-    nltk.download('punkt')
-
     dataset_ready, dataset_message = ensure_dataset()
     reload_predictor()
 

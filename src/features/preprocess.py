@@ -1,20 +1,15 @@
 import multiprocessing as mp
 import re
 
-import nltk
-
 from nltk.stem import PorterStemmer
-from nltk.tokenize import word_tokenize
+from nltk.tokenize import wordpunct_tokenize
 
 
 stemmer = PorterStemmer()
 
 
 def ensure_nltk_resources():
-    try:
-        nltk.data.find("tokenizers/punkt")
-    except LookupError:
-        nltk.download("punkt", quiet=True)
+    return None
 
 
 def clean_text(text: str) -> str:
@@ -27,7 +22,7 @@ def clean_text(text: str) -> str:
 
 
 def stem_text(text: str):
-    tokens = word_tokenize(text)
+    tokens = wordpunct_tokenize(text)
     stemmed = [stemmer.stem(token) for token in tokens]
 
     return " ".join(stemmed)

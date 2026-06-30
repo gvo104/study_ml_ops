@@ -19,7 +19,8 @@ boto3
 dvc[s3]
 
 # serving
-fastapi
+fastapi>=0.115,<0.116
+starlette>=0.40,<0.47
 uvicorn
 pydantic
 prometheus-client
