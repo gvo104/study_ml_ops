@@ -3,6 +3,7 @@ kind: Kustomization
 
 resources:
   - namespace.yml
+  - argocd-server-service.yml
   - admin-secret.yml
   - ml-team-project.yml
   - ml-team-application.yml

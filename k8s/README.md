@@ -92,7 +92,6 @@ make k8s-forward
 kubectl port-forward -n ml-team svc/minio 9000:9000
 kubectl port-forward -n ml-team svc/mlflow 5000:5000
 kubectl port-forward -n ml-team svc/webapp 8000:8000
-kubectl port-forward -n argocd svc/argocd-server 8080:443
 ```
 
 ### Using Kustomize
@@ -118,7 +117,7 @@ make argocd-install
 # Register the GitOps project and application.
 make argocd-app
 
-# Open local browser access for Argo CD and the app services.
+# Open local browser access for the app services.
 make k8s-forward
 
 # Argo CD UI:
@@ -182,7 +181,7 @@ inside the cluster.
 
 | Port | Service | Description |
 |------|---------|-------------|
-| 8080 | HTTPS | Argo CD web UI, forwarded from `argocd-server` |
+| 8080 | HTTPS | Argo CD web UI, exposed by `argocd-server` LoadBalancer |
 
 **Credentials:**
 - Username: `admin`
