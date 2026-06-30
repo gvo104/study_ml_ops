@@ -1,4 +1,4 @@
-.PHONY: clean data environment lint requirements train predict test serve experiments dvc-repro dvc-pull sync_data_to_s3 sync_data_from_s3 k8s-forward argocd-install argocd-app argocd-sync
+.PHONY: clean data environment lint requirements train predict test serve experiments dvc-repro dvc-pull sync_data_to_s3 sync_data_from_s3 k8s-forward argocd-install argocd-app argocd-password argocd-sync
 
 #################################################################################
 # GLOBALS                                                                       #
@@ -194,18 +194,23 @@ infra-status:
 infra-logs:
 	docker compose logs -f mlflow
 
-## Forward Kubernetes services to localhost:9000, localhost:5000 and localhost:8000
+## Forward Kubernetes services to localhost:9000, localhost:5000, localhost:8000 and Argo CD to localhost:8080
 k8s-forward:
 	./scripts/k8s-port-forward.sh
 
 ## Install Argo CD into the current Kubernetes cluster
 argocd-install:
 	kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-	kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+	kubectl apply --server-side --force-conflicts -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
 ## Register the ml-team application in Argo CD
 argocd-app:
 	kubectl apply -k argocd/
+
+## Print the initial Argo CD admin password
+argocd-password:
+	kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath='{.data.password}' | base64 -d
+	@echo
 
 ## Force sync and wait for the ml-team application
 argocd-sync:

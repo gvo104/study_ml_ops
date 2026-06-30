@@ -9,7 +9,7 @@ spec:
   project: ml-team
   source:
     repoURL: https://github.com/gvo104/study_ml_ops.git
-    targetRevision: main
+    targetRevision: feature/kubernates-argo-cd
     path: k8s/base
   destination:
     server: https://kubernetes.default.svc

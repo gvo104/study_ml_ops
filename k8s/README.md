@@ -92,6 +92,7 @@ make k8s-forward
 kubectl port-forward -n ml-team svc/minio 9000:9000
 kubectl port-forward -n ml-team svc/mlflow 5000:5000
 kubectl port-forward -n ml-team svc/webapp 8000:8000
+kubectl port-forward -n argocd svc/argocd-server 8080:443
 ```
 
 ### Using Kustomize
@@ -117,8 +118,14 @@ make argocd-install
 # Register the GitOps project and application.
 make argocd-app
 
-# Optional: open Argo CD UI.
-kubectl port-forward -n argocd svc/argocd-server 8080:443
+# Open local browser access for Argo CD and the app services.
+make k8s-forward
+
+# Argo CD UI:
+#   URL:      https://localhost:8080
+#   Username: admin
+#   Password: print with the command below
+make argocd-password
 ```
 
 Application definition: [../argocd/ml-team-application.yml](../argocd/ml-team-application.yml).
@@ -170,6 +177,16 @@ inside the cluster.
 - `MLFLOW_TRACKING_URI`: `http://mlflow:5000`
 - `MLFLOW_ENABLED`: `true`
 - S3/DVC/MLflow artifact endpoint: `http://minio:9000`
+
+### Argo CD
+
+| Port | Service | Description |
+|------|---------|-------------|
+| 8080 | HTTPS | Argo CD web UI, forwarded from `argocd-server` |
+
+**Credentials:**
+- Username: `admin`
+- Password: `make argocd-password`
 
 ## Configuring Kubernetes Locally
 
