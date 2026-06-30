@@ -1,17 +1,18 @@
-.. Primary_Medical_Consultation documentation master file
+study_ml_ops documentation
+==========================
 
-Primary_Medical_Consultation
-============================
+Документация проекта ``study_ml_ops``. Корневой ``README.md`` остается главным
+обзорным документом по репозиторию, а страницы ниже дают структурированное
+описание установки, команд и модульной структуры.
 
-MLOps-проект для классификации текстов по теме mental health.
+Полезные документы вне Sphinx:
 
-Дополнительные MD-гайды (не в Sphinx toctree):
+- ``README.md`` — полный обзор проекта, его возможностей и ограничений
+- ``drift_v2/README.md`` — подробности по drift-monitoring контуру
+- ``k8s/README.md`` — Kubernetes и Argo CD инфраструктура
 
-- ``docs/refactoring-plan.md`` — план и статус рефакторинга
-- ``docs/mlflow-minio-setup.md`` — MinIO, MLflow, DVC, эксперименты
-- ``docs/migration-context.md`` — архив контекста миграции
-
-Contents:
+Contents
+--------
 
 .. toctree::
    :maxdepth: 2
@@ -21,7 +22,7 @@ Contents:
    project-structure
 
 Indices and tables
-==================
+------------------
 
 * :ref:`genindex`
 * :ref:`modindex`

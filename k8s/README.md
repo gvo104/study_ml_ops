@@ -1,244 +1,145 @@
-# K8s Infrastructure (Equivalent to docker-compose)
+# Kubernetes infrastructure
 
-This directory contains Kubernetes manifests for deploying MLflow and MinIO services, similar to the existing `docker-compose.yml`.
+Каталог `k8s/` содержит Kubernetes manifests для инфраструктурной части проекта `study_ml_ops`. На текущий момент это не полный деплой всего приложения, а набор ресурсов для MinIO и MLflow с заготовкой GitOps-интеграции через Argo CD.
 
-## Architecture
+## Что здесь есть
 
+В `k8s/base/` находятся:
+
+- `configmap.yml`
+  namespace, ConfigMap и Secret с базовыми значениями для MinIO/MLflow;
+- `minio.yml`
+  Deployment и Service для MinIO;
+- `mlflow.yml`
+  Job `minio-init` и Deployment/Service для MLflow;
+- `kustomization.yml`
+  базовый Kustomize entrypoint.
+
+В `../arcd/ml-team-application.yml` находится Argo CD Application, указывающий на `k8s/base`.
+
+## Что здесь отсутствует
+
+Сейчас в каталоге нет Kubernetes manifests для:
+
+- основного FastAPI inference/UI сервиса;
+- drift monitoring stack;
+- Prometheus и Grafana;
+- ingress, TLS и production networking;
+- persistent volumes для production storage;
+- полноценной secrets strategy.
+
+Поэтому этот каталог нужно воспринимать как частичную инфраструктурную основу, а не как завершенный Kubernetes deployment всего проекта.
+
+## Архитектура
+
+Текущий Kubernetes-контур покрывает только связку:
+
+```text
+MinIO (S3-compatible storage)
+        ↓
+   bucket ml-team
+        ↓
+     MLflow
 ```
-┌─────────────────┐       ┌──────────────────┐
-│     MinIO       │──────▶│  Bucket: ml-team │
-│   (S3 Storage)  │       │                  │
-└─────────────────┘       └──────────────────┘
-         ▲                           |
-         |                           v
-         |                 ┌──────────────────┐
-         └────────────────▶│     MLflow       │
-                           │ (Tracking Server)│
-                           └──────────────────┘
-```
 
-## Directory Structure
+Именно эта часть повторяет локальную связку из `docker-compose.yml`.
 
-```
-k8s/
-├── base/                    # Base Kubernetes manifests
-│   ├── configmap.yml       # Configuration values
-│   ├── secret.yml          # Sensitive data (secrets)
-│   ├── minio.yml           # MinIO deployment & service
-│   └── mlflow.yml          # MLflow deployment, init job & service
-└── overlays/               # Environment-specific configs (optional)
-    ├── dev/                # Dev environment overrides
-    └── production/         # Production environment overrides
-```
+## Быстрый запуск
 
-## Prerequisites
-
-- Kubernetes cluster (minikube, k3d, EKS, GKE, etc.)
-- `kubectl` installed and configured
-- Argo CD installed in your cluster
-- kustomize (optional, for applying manifests)
-
-## Quick Start
-
-### Using kubectl directly
+### Через kubectl
 
 ```bash
-# Create namespace
-kubectl create namespace ml-team
-
-# Apply all manifests
 kubectl apply -f k8s/base/
-
-# Check status
-kubectl get pods -n ml-team
-
-# Access services
-# MinIO Console: http://<kubernetes-ip>:31001 (or use Ingress)
-# MLflow UI: http://<kubernetes-ip>:31000 (or use Ingress)
-```
-
-### Using Kustomize
-
-```bash
-# Build and apply
-kubectl kustomize k8s/base | kubectl apply -f -
-
-# Or with local kustomize
-kustomize build k8s/base | kubectl apply -f -
-```
-
-### Using Argo CD (Recommended)
-
-1. Deploy the `ml-team-app` to your cluster via Argo CD UI:
-   - Open Argo CD dashboard
-   - Click "Add Application"
-   - Fill in the details from [../arcd/ml-team-application.yml](../arcd/ml-team-application.yml)
-
-2. Push changes to deploy automatically:
-   ```bash
-   # Modify k8s/base/ files
-   git commit -m "Update infrastructure"
-   git push origin main
-   ```
-
-Argo CD will automatically sync and update the cluster.
-
-## Services
-
-### MinIO (S3 Storage)
-
-| Port  | Service    | Description          |
-|-------|------------|----------------------|
-| 9000  | S3 API     | Object storage API   |
-| 9001  | Console    | Web UI for MinIO     |
-
-**Credentials:**
-- Username: `minioadmin`
-- Password: `minioadmin`
-
-### MLflow Tracking Server
-
-| Port | Service | Description      |
-|------|---------|------------------|
-| 5000 | Server  | MLflow tracking  |
-
-**Environment:**
-- Backend: SQLite (local) or S3 (via MinIO)
-- Artifact storage: `s3://ml-team/mlflow-artifacts` (MinIO)
-
-## Configuring Kubernetes Locally
-
-### Using k3d (Recommended for development)
-
-```bash
-# Start a local cluster
-k3d cluster create ml-cluster --agents 1
-
-# Apply manifests
-kubectl apply -f k8s/base/
-
-# Get access to cluster
-k3d kubeconfig export ml-cluster
-```
-
-### Using minikube
-
-```bash
-# Start minikube
-minikube start --memory 4096 --cpus 2
-
-# Load into Docker for images
-minikube docker-env
-
-# Apply manifests
-kubectl apply -f k8s/base/
-
-# Exit Docker env
-exit
-```
-
-### Using kind (Kubernetes in Docker)
-
-```bash
-# Create cluster
-kind create cluster --name ml-cluster
-
-# Apply with Kubernetes YAML
-kubectl apply -f k8s/base/
-
-# Or using kustomize
-kustomize build k8s/base | kubectl apply -f -
-```
-
-## Updating Infrastructure
-
-When you change `k8s/base/` files:
-
-1. **Manual update:**
-   ```bash
-   # Check Argo CD status
-   argocd app get ml-team-app
-   
-   # Force sync (if needed)
-   argocd app set --sync-only ml-team-app
-   ```
-
-2. **Automatic update (via CI/CD):**
-   - Push changes to `main` branch
-   - GitHub Actions workflow will deploy to Argo CD
-   - Argo CD will automatically sync to Kubernetes cluster
-
-## Monitoring
-
-```bash
-# View all resources in ml-team namespace
 kubectl get all -n ml-team
-
-# View pods
-kubectl get pods -n ml-team
-
-# View logs for specific pod
-kubectl logs -n ml-team <pod-name>
-
-# Describe deployment
-kubectl describe deployment mlflow -n ml-team
-
-# Watch events
-kubectl get events -n ml-team --watch
 ```
 
-## Troubleshooting
-
-### MinIO not starting
+### Через Kustomize
 
 ```bash
-# Check pod status
-kubectl get pods -n ml-team
-
-# View logs
-kubectl logs -n ml-team minio-xxxxx-x
+kubectl kustomize k8s/base | kubectl apply -f -
 ```
 
-Common issues:
-- Insufficient memory/resources
-- Missing secret configuration
-- Network policies blocking access
+Или:
 
-### MLflow not connecting to MinIO
-
-Ensure ConfigMap `minio-config` has correct values:
 ```bash
-kubectl get configmap minio-config -n ml-team -o yaml
+kustomize build k8s/base | kubectl apply -f -
 ```
 
-## Environment Variables Reference
+## Сервисы
 
-| Variable | Used By | Default Value |
-|----------|---------|---------------|
-| `MINIO_ROOT_USER` | MinIO, MLflow | `minioadmin` |
-| `MINIO_ROOT_PASSWORD` | MinIO, MLflow | `minioadmin` |
-| `AWS_ACCESS_KEY_ID` | MLflow | (from configmap) |
-| `AWS_SECRET_ACCESS_KEY` | MLflow | (from configmap) |
-| `MLFLOW_S3_ENDPOINT_URL` | MLflow | `http://minio:9000` |
-| `AWS_DEFAULT_REGION` | MLflow | `us-east-1` |
+### MinIO
 
-## Migration from Docker Compose
+- Service: `minio`
+- Ports:
+  - `9000` — S3 API
+  - `9001` — console
 
-The Kubernetes setup is designed to be equivalent to your existing `docker-compose.yml`:
+### MLflow
 
-| docker-compose           | Kubernetes          | Notes                        |
-|--------------------------|---------------------|------------------------------|
-| `version: '3.8'`         | N/A                 | K8s uses API versions        |
-| `services.minio.image`   | `deployment.image`  | Container image              |
-| `ports`                  | `service.ports`     | ClusterIP services           |
-| `environment`            | `env` / `configmap` | ConfigMap for configs        |
-| `depends_on`             | Init Job           | minio-init Job before MLflow |
-| `volumes`                | `volumeMounts/volumes` | emptyDir volumes          |
+- Service: `mlflow`
+- Port:
+  - `5000` — tracking server
 
-## Next Steps
+MLflow использует:
 
-- Add Ingress Controller for external access
-- Configure persistent storage (PV/PVC) instead of emptyDir
-- Set up monitoring with Prometheus/Grafana
-- Add certificate management for HTTPS
-- Implement RBAC for role-based access control
+- S3 endpoint: `http://minio:9000`
+- bucket: `ml-team`
+- backend volume: `emptyDir`
+
+## Argo CD
+
+Файл `arcd/ml-team-application.yml` описывает Argo CD Application для `k8s/base`.
+
+Важно:
+
+- это GitOps-заготовка инфраструктуры;
+- она не покрывает деплой FastAPI/UI сервиса;
+- для реальной эксплуатации потребуется валидная Argo CD инсталляция, корректные repo settings и рабочие secrets.
+
+## CI/CD и Kubernetes
+
+В `.github/workflows/deploy.yml` есть попытка интеграции с Argo CD. Однако на текущем состоянии репозитория этот workflow нельзя считать полностью готовым production CD:
+
+- деплой относится к инфраструктурным манифестам, а не ко всему приложению;
+- секреты и переменные окружения требуют реальной настройки;
+- сам workflow выглядит как заготовка и требует дополнительной валидации.
+
+## Мониторинг и troubleshooting
+
+Проверить ресурсы:
+
+```bash
+kubectl get all -n ml-team
+```
+
+Посмотреть логи:
+
+```bash
+kubectl logs -n ml-team deployment/minio
+kubectl logs -n ml-team deployment/mlflow
+```
+
+Проверить Job инициализации bucket:
+
+```bash
+kubectl get jobs -n ml-team
+kubectl logs -n ml-team job/minio-init
+```
+
+## Ограничения
+
+- используется `emptyDir`, а не постоянное хранилище;
+- нет manifests для основного API/UI контейнера;
+- нет отдельного deployment для monitoring stack;
+- нет production ingress и сетевой конфигурации;
+- нет полноценной Kubernetes-операционки вокруг модели и переобучения.
+
+## Когда использовать этот каталог
+
+Этот каталог полезен, если нужно:
+
+- показать, как MinIO и MLflow могут быть развернуты в Kubernetes;
+- подготовить базу для дальнейшего GitOps-деплоя;
+- развивать инфраструктуру дальше до полноценного Minikube/Kubernetes решения.
+
+Если цель — запуск проекта целиком локально, основной поддерживаемый сценарий остается за `docker-compose.yml` и `docker-compose.monitoring.yml`.

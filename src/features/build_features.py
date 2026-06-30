@@ -26,14 +26,19 @@ class FeatureBuilder:
             ngram_range=cfg.ngram_range,
             max_features=cfg.tfidf_max_features,
         )
+        self.svd_components = cfg.svd_components
+        self.svd = self._make_svd(cfg.svd_components)
 
-        self.svd = TruncatedSVD(
-            n_components=cfg.svd_components,
+    def _make_svd(self, n_components: int) -> TruncatedSVD:
+        return TruncatedSVD(
+            n_components=n_components,
             random_state=RANDOM_STATE,
         )
 
     def fit_transform(self, texts, numerical_features):
         tfidf = self.vectorizer.fit_transform(texts)
+        n_components = min(self.svd_components, tfidf.shape[1])
+        self.svd = self._make_svd(n_components)
         reduced = self.svd.fit_transform(tfidf)
 
         return np.hstack([reduced, numerical_features])

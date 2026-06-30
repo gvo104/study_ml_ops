@@ -1,13 +1,11 @@
 Getting started
 ===============
 
-Проект предназначен для классификации текстов по категориям mental health.
-Production-код — в ``src/``, исследования — в ``notebooks/``.
+Эта страница описывает базовый сценарий работы с проектом в окружении
+``ML_Ops``.
 
-Установка
----------
-
-Основной файл окружения: ``environment.yml``.
+Установка окружения
+-------------------
 
 .. code-block:: bash
 
@@ -16,91 +14,144 @@ Production-код — в ``src/``, исследования — в ``notebooks/`
    pip install -r requirements.txt
    pip install -r requirements-dev.txt
 
-Для экспериментов с LightGBM (если пакет не в conda-окружении):
+При необходимости можно дополнительно проверить интерпретатор:
 
 .. code-block:: bash
 
-   pip install lightgbm
-
-Скопируйте ``.env.example`` в ``.env`` для MLflow/MinIO (опционально; без
-файла используются локальные дефолты ``minioadmin``).
+   python --version
 
 Подготовка данных
 -----------------
 
+Основной dataset ожидается в ``data/processed/fin_data.csv``.
+
+Подготовить processed dataset:
+
 .. code-block:: bash
 
+   conda activate ML_Ops
    make data
-   dvc pull    # если данные в DVC remote
 
-Ожидаемый файл: ``data/processed/fin_data.csv``.
-
-Обучение (production)
----------------------
-
-Базовый конфиг: ``configs/xgboost_baseline.yaml``. Локальные артефакты
-перезаписывают ``models/xgboost/``.
+Или подтянуть данные через DVC:
 
 .. code-block:: bash
 
-   make infra-up    # опционально: MLflow :5000, MinIO :9001
+   conda activate ML_Ops
+   make dvc-pull
+
+Baseline-обучение
+-----------------
+
+Базовый конфиг — ``configs/xgboost_baseline.yaml``.
+
+.. code-block:: bash
+
+   conda activate ML_Ops
    make train
 
-Пакетные эксперименты (MLflow)
---------------------------------
-
-Запускает все YAML из ``configs/experiments/`` (XGBoost, LightGBM,
-Logistic Regression, Random Forest). Локальную production-модель не
-перезаписывает. В MLflow — метрики, модель и ``evaluation/confusion_matrix.png``.
-
-.. code-block:: bash
-
-   make experiments
-   # или
-   study-mlops experiments
-
-Один эксперимент:
-
-.. code-block:: bash
-
-   python -m src.models.train_model \
-     --config configs/experiments/lightgbm_baseline.yaml
+После обучения артефакты сохраняются в ``models/xgboost/``.
 
 Инференс
 --------
 
-CLI (модель из ``models/xgboost/``):
+CLI:
 
 .. code-block:: bash
 
+   conda activate ML_Ops
    make predict TEXT="I feel sad and anxious and cannot sleep."
 
 HTTP API:
 
 .. code-block:: bash
 
+   conda activate ML_Ops
    make serve
+
+После запуска доступны:
+
+- ``http://localhost:8000/``
+- ``http://localhost:8000/experiments``
+- ``http://localhost:8000/docs``
+- ``http://localhost:8000/health``
+
+Пример запроса:
+
+.. code-block:: bash
+
    curl -X POST http://localhost:8000/predict \
      -H "Content-Type: application/json" \
      -d '{"text": "I feel sad and anxious."}'
 
-   curl http://localhost:8000/health
+MLflow и MinIO
+--------------
 
-Тесты и качество кода
----------------------
+Локальная инфраструктура поднимается через Docker Compose:
 
 .. code-block:: bash
 
+   conda activate ML_Ops
+   cp .env.example .env
+   make infra-up
+
+После запуска:
+
+- MLflow UI: ``http://localhost:5000``
+- MinIO Console: ``http://localhost:9001``
+
+Эксперименты
+------------
+
+Все YAML-конфиги из ``configs/experiments/``:
+
+.. code-block:: bash
+
+   conda activate ML_Ops
+   make experiments
+
+CLI-эквивалент:
+
+.. code-block:: bash
+
+   conda activate ML_Ops
+   study-mlops experiments --data-path data/processed/fin_data.csv --configs-dir configs/experiments
+
+Drift monitoring
+----------------
+
+Офлайн demo monitoring:
+
+.. code-block:: bash
+
+   conda activate ML_Ops
+   make drift-monitoring-offline
+
+Online synthetic monitoring:
+
+.. code-block:: bash
+
+   conda activate ML_Ops
+   make drift-monitoring-online
+
+Отдельный synthetic API:
+
+.. code-block:: bash
+
+   conda activate ML_Ops
+   make serve-synthetic
+
+Проверки
+--------
+
+.. code-block:: bash
+
+   conda activate ML_Ops
    make test
    make lint
-   tox
 
-MLOps
------
+Связанные документы
+-------------------
 
-.. code-block:: bash
-
-   make dvc-repro
-   make dvc-pull
-
-См. также ``docs/mlflow-minio-setup.md`` и ``docs/refactoring-plan.md``.
+- ``README.md`` — полный обзор проекта
+- ``commands.rst`` — список основных команд
+- ``project-structure.rst`` — структура модулей и каталогов
