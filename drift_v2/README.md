@@ -1,77 +1,181 @@
-# Drift V2 Groundwork
+# drift_v2
 
-`drift_v2` is a clean rebuild track placed next to the legacy `drift` module.
+`drift_v2` — отдельный демонстрационный контур мониторинга качества и дрейфа для проекта `study_ml_ops`. Он не заменяет основной FastAPI inference API и не встроен в него напрямую, а работает рядом с ним как monitoring-пайплайн с offline/online сценариями.
 
-Current scope:
+## Назначение
 
-- read immutable demo events from the existing SQLite store;
-- define explicit event-level and window-level contracts;
-- make window construction deterministic for offline playback;
-- run a clean online synthetic loop next to offline playback.
+Подсистема нужна для следующих задач:
 
-## Data Boundaries
+- считать оконные drift-метрики по потоку событий;
+- воспроизводить накопленный event stream из SQLite;
+- запускать synthetic online сценарий с generator/expert ролями;
+- публиковать monitoring-метрики в Prometheus;
+- отображать их в Grafana;
+- сохранять run-артефакты и markdown-отчеты.
 
-Event-level data comes from SQLite `prediction_events`.
+## Состав подсистемы
 
-Each `DemoEvent` carries only the fields we currently need to reason about the new pipeline:
+### Основные модули
 
-- event identity and ordering: `event_index`, `event_id`, `created_at`
-- request payload: `raw_text`, `tokens_stemmed`, `num_of_characters`, `num_of_sentences`
-- model outputs: `model_prediction`, `model_confidence`
-- expert outputs: `expert_label`, `expert_confidence`
-- hidden demo labels: `hidden_phase`, `hidden_target_label`
+- `cli.py`:
+  вход в offline/online сценарии `drift_v2`.
+- `pipeline.py`, `online.py`, `playback.py`, `windows.py`, `repository.py`:
+  orchestration событий, окон и сценариев воспроизведения.
+- `metrics.py`, `contracts.py`, `config.py`:
+  контракты данных, расчет метрик и конфигурация.
 
-This gives us a strict split:
+### `runner/`
 
-- per-event layer:
-  - model prediction
-  - model confidence
-  - expert label
-  - expert confidence
-- per-window layer:
-  - all drift and quality aggregates
-  - window status
-  - baseline calibration
+Пакет `runner` отвечает за production-like обработку monitoring run-а:
 
-## Window Rules
+- читает reference statistics;
+- строит окна событий;
+- считает drift-метрики;
+- пишет JSON-артефакты;
+- формирует markdown report;
+- собирает label diagnostics.
 
-Offline playback uses a visible prefix of the event stream.
+Ключевые артефакты run-а сохраняются в `drift_v2/artifacts/runs/`.
 
-For `window_size=20` and `step_size=20`:
+### `monitoring/`
 
-- `visible_events < 20` -> `0` complete windows
-- `visible_events = 20` -> `1` complete window
-- `visible_events = 40` -> `2` complete windows
-- `visible_events = 120` -> `6` complete windows
+Отдельный FastAPI exporter:
 
-This matches the intended demo semantics: a window is computed only after its full batch of events has arrived.
+- `GET /health`
+- `GET /metrics`
 
-## Online Rules
+Exporter читает последние run snapshots и отдает их в формате Prometheus metrics.
 
-Online mode appends new synthetic events into SQLite under a clean run-scoped `source_mode`.
+### `synthetic_api/`
 
-- offline:
-  - immutable SQLite stream
-  - visible prefix replay
-- online:
-  - append-only SQLite stream
-  - visible events equal current run event count
+Это отдельный сервис для demo online сценария. Он нужен для генерации synthetic traffic и экспертных ответов, а не для основного пользовательского inference API проекта.
 
-Online loop order per tick:
+Внутри каталога находятся:
 
-1. generator creates synthetic requests
-2. `predict-api` writes model outputs into SQLite
-3. expert worker labels recent unlabeled events of the same clean `source_mode`
-4. v2 window metrics are recomputed from full windows only
-5. one stable run directory is fully rewritten
+- FastAPI app;
+- prompt templates;
+- runtime adapters;
+- frontend `index.html` для demo-сценария.
 
-## Next Layer
+### `store/`
 
-Once this groundwork is accepted, the next step is to add:
+SQLite-backed event storage:
 
-1. window metric computation on top of `WindowBatch`
-2. stable artifact writer for a single demo run
-3. Prometheus exporter for:
-   - recent event-level outputs
-   - window-level aggregates
-4. Grafana panels built on those two separate layers
+- `schema.sql` — схема базы;
+- `db.py` — доступ к БД;
+- `events.sqlite` — demo store с событиями.
+
+### `reference/`
+
+Reference statistics и reference dataset для сравнения окон:
+
+- `metadata.json`
+- `reference_stats.json`
+- `reference_train.csv`
+
+## Drift-метрики
+
+В текущей реализации используются следующие ключевые метрики:
+
+- `token_distribution_jsd`
+- `model_prediction_distribution_jsd`
+- `target_distribution_jsd`
+- `model_expert_disagreement_rate`
+- `model_expert_macro_f1`
+- `token_label_association_drift`
+
+Что это означает на практике:
+
+- data drift покрывается через распределения токенов;
+- target drift покрывается через распределение экспертных меток;
+- proxy для concept drift покрывается через disagreement, macro F1 и изменение связи токенов с метками.
+
+Это monitoring-реализация demo-уровня. Отдельного полноформатного production-модуля с явной таксономией concept drift в репозитории сейчас нет.
+
+## Запуск
+
+Все команды ниже предполагают:
+
+```bash
+conda activate ML_Ops
+```
+
+### Offline monitoring
+
+```bash
+make drift-monitoring-offline
+```
+
+Команда:
+
+- поднимает Grafana, Prometheus и exporter;
+- запускает offline replay по SQLite event store;
+- обновляет run-артефакты в `drift_v2/artifacts/runs/`.
+
+### Online synthetic monitoring
+
+```bash
+make drift-monitoring-online
+```
+
+Команда:
+
+- поднимает monitoring stack;
+- запускает synthetic online loop;
+- пишет новые события и обновляет monitoring metrics.
+
+### Synthetic API отдельно
+
+```bash
+make serve-synthetic
+```
+
+По умолчанию сервис поднимается на `http://localhost:8001`.
+
+### Monitoring stack
+
+Адреса после запуска:
+
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000`
+- exporter metrics: `http://localhost:9208/metrics`
+- exporter health: `http://localhost:9208/health`
+
+Остановка:
+
+```bash
+make monitoring-down
+```
+
+## Артефакты и отчеты
+
+Подсистема генерирует:
+
+- JSON snapshots для monitoring;
+- данные по оконным метрикам;
+- diagnostics по меткам;
+- markdown report `run_report.md`.
+
+Markdown report содержит:
+
+- идентификатор run-а;
+- режим запуска;
+- число окон;
+- наиболее выраженные drift-сегменты;
+- проблемные метки;
+- показатели с недостатком данных.
+
+## Ограничения
+
+- `drift_v2` не интегрирован как единая runtime-часть основного API `src.api`.
+- Offline и online сценарии ориентированы на demo и мониторинговую диагностику.
+- Synthetic API не является пользовательским production endpoint.
+- Monitoring зависит от структуры run-артефактов и не заменяет централизованную observability-платформу.
+
+## Связанные файлы
+
+- `docker-compose.monitoring.yml`
+- `monitoring/prometheus/prometheus.yml`
+- `monitoring/prometheus/drift_v2_rules.yml`
+- `monitoring/grafana/dashboards/`
+- `drift_v2/docs/online_runbook.md`
