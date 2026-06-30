@@ -16,7 +16,7 @@ data:
   DVC_S3_ENDPOINT_URL: "http://minio:9000"
   MLFLOW_ENABLED: "true"
   MLFLOW_S3_ENDPOINT_URL: "http://minio:9000"
-  MLFLOW_SERVER_ALLOWED_HOSTS: "localhost,localhost:5000,localhost:30500,127.0.0.1,127.0.0.1:5000,127.0.0.1:30500,mlflow,mlflow:5000,mlflow.ml-team.svc,mlflow.ml-team.svc.cluster.local"
+  MLFLOW_SERVER_ALLOWED_HOSTS: "localhost,localhost:5000,127.0.0.1,127.0.0.1:5000,mlflow,mlflow:5000,mlflow.ml-team.svc,mlflow.ml-team.svc.cluster.local"
   MLFLOW_TRACKING_URI: "http://mlflow:5000"
 ---
 apiVersion: v1
