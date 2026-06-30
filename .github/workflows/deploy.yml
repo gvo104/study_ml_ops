@@ -7,12 +7,16 @@ on:
       - dev
     paths:
       - 'k8s/**'
+      - 'argocd/**'
+      - 'arcd/**'
       - '.github/workflows/deploy.yml'
   pull_request:
     branches:
       - main
     paths:
       - 'k8s/**'
+      - 'argocd/**'
+      - 'arcd/**'
       - '.github/workflows/deploy.yml'
 
 env:
@@ -37,14 +41,22 @@ jobs:
       - name: Render Kustomize manifests
         run: kubectl kustomize k8s/base > rendered-manifests.yml
 
-      - name: Validate rendered manifests
-        run: kubectl apply --dry-run=client --validate=false -f rendered-manifests.yml
+      - name: Check rendered Kubernetes manifests
+        run: test -s rendered-manifests.yml
+
+      - name: Render Argo CD manifests
+        run: kubectl kustomize argocd > rendered-argocd.yml
+
+      - name: Check rendered Argo CD manifests
+        run: test -s rendered-argocd.yml
 
       - name: Upload rendered manifests
         uses: actions/upload-artifact@v4
         with:
           name: rendered-k8s-manifests
-          path: rendered-manifests.yml
+          path: |
+            rendered-manifests.yml
+            rendered-argocd.yml
 
   argocd-sync:
     name: Sync Argo CD on main

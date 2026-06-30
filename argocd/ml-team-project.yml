@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: ml-team
+  namespace: argocd
+spec:
+  description: Study ML Ops Kubernetes applications
+  sourceRepos:
+    - https://github.com/gvo104/study_ml_ops.git
+  destinations:
+    - namespace: ml-team
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
