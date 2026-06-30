@@ -27,14 +27,16 @@ This directory contains Kubernetes manifests for deploying MinIO, MLflow and the
 
 ```
 k8s/
-├── base/                    # Base Kubernetes manifests
-│   ├── configmap.yml       # Configuration values
-│   ├── minio.yml           # MinIO deployment & service
-│   ├── mlflow.yml          # MLflow deployment, init job & service
-│   └── webapp.yml          # API deployment & service
-└── overlays/               # Environment-specific configs (optional)
-    ├── dev/                # Dev environment overrides
-    └── production/         # Production environment overrides
+└── base/                   # Base Kubernetes manifests
+    ├── configmap.yml       # Configuration values
+    ├── minio.yml           # MinIO deployment & service
+    ├── mlflow.yml          # MLflow deployment, init job & service
+    └── webapp.yml          # API deployment & service
+
+argocd/
+├── kustomization.yml       # Argo CD bootstrap manifests
+├── ml-team-project.yml     # Argo CD project permissions
+└── ml-team-application.yml # GitOps app that deploys k8s/base
 ```
 
 ## Prerequisites
@@ -104,19 +106,36 @@ kustomize build k8s/base | kubectl apply -f -
 
 ### Using Argo CD (Recommended)
 
-1. Deploy the `ml-team-app` to your cluster via Argo CD UI:
-   - Open Argo CD dashboard
-   - Click "Add Application"
-   - Fill in the details from [../arcd/ml-team-application.yml](../arcd/ml-team-application.yml)
+Argo CD runs the Kubernetes CD loop. It watches this repository, renders
+`k8s/base`, and automatically syncs the `ml-team` namespace on every change to
+`main`.
 
-2. Push changes to deploy automatically:
-   ```bash
-   # Modify k8s/base/ files
-   git commit -m "Update infrastructure"
-   git push origin main
-   ```
+```bash
+# Install Argo CD in the current cluster.
+make argocd-install
 
-Argo CD will automatically sync and update the cluster.
+# Register the GitOps project and application.
+make argocd-app
+
+# Optional: open Argo CD UI.
+kubectl port-forward -n argocd svc/argocd-server 8080:443
+```
+
+Application definition: [../argocd/ml-team-application.yml](../argocd/ml-team-application.yml).
+
+Push changes to deploy automatically:
+
+```bash
+# Modify k8s/base/ or argocd/ files
+git commit -m "Update Kubernetes deployment"
+git push origin main
+```
+
+The GitHub Actions workflow validates both `k8s/base` and `argocd/`. On pushes
+to `main`, it can also trigger `argocd app sync ml-team-app` when
+`ARGOCD_SERVER`, `ARGOCD_USERNAME`, and `ARGOCD_PASSWORD` repository secrets are
+configured. Even without those secrets, Argo CD still syncs automatically from
+inside the cluster.
 
 ## Services
 
@@ -206,13 +225,14 @@ When you change `k8s/base/` files:
    argocd app get ml-team-app
    
    # Force sync (if needed)
-   argocd app set --sync-only ml-team-app
+   argocd app sync ml-team-app
+   argocd app wait ml-team-app --health --sync --timeout 300
    ```
 
-2. **Automatic update (via CI/CD):**
+2. **Automatic update (via Argo CD + CI/CD):**
    - Push changes to `main` branch
-   - GitHub Actions workflow will deploy to Argo CD
-   - Argo CD will automatically sync to Kubernetes cluster
+   - GitHub Actions validates the rendered Kubernetes and Argo CD manifests
+   - Argo CD automatically syncs `k8s/base` to the Kubernetes cluster
 
 ## Monitoring
 
