@@ -1,4 +1,4 @@
-.PHONY: clean data environment lint requirements train predict test serve serve-synthetic experiments dvc-repro dvc-pull drift-monitoring-offline drift-monitoring-online monitoring-down monitoring-status infra-up infra-down infra-status infra-logs help
+.PHONY: clean data environment lint requirements train predict test serve serve-synthetic experiments dvc-repro dvc-pull drift-monitoring-offline drift-monitoring-online monitoring-down monitoring-status infra-up infra-down infra-status infra-logs require-compose help
 
 #################################################################################
 # GLOBALS                                                                       #
@@ -8,6 +8,10 @@ PROJECT_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
 PROJECT_NAME = study_ml_ops
 PYTHON_INTERPRETER = python3
 ENV_NAME = ML_Ops
+DOCKER_BIN := $(shell command -v docker 2>/dev/null)
+PODMAN_BIN := $(shell command -v podman 2>/dev/null)
+PODMAN_COMPOSE_BIN := $(shell command -v podman-compose 2>/dev/null)
+COMPOSE ?= $(if $(DOCKER_BIN),docker compose,$(if $(PODMAN_BIN),podman compose,$(if $(PODMAN_COMPOSE_BIN),podman-compose,)))
 
 ifeq (,$(shell which conda))
 HAS_CONDA=False
@@ -61,18 +65,27 @@ serve-synthetic:
 # DRIFT DEMO PIPELINE                                                           #
 #################################################################################
 
+## Verify that a compose-compatible container runtime is available
+require-compose:
+	@if [ -z "$(COMPOSE)" ]; then \
+		echo "No container compose command found."; \
+		echo "Install Docker Desktop / Docker Engine with Compose, or Podman."; \
+		echo "You can also run make with COMPOSE='docker compose' (or another compatible command)."; \
+		exit 1; \
+	fi
+
 ## Restart Grafana/Prometheus/exporter and run infinite offline replay from SQLite
-drift-monitoring-offline:
-	docker compose -f docker-compose.monitoring.yml up -d --build --force-recreate grafana
+drift-monitoring-offline: require-compose
+	$(COMPOSE) -f docker-compose.monitoring.yml up -d --build --force-recreate grafana
 	-pkill -f 'python3 -m drift_v2.cli offline --db-path drift_v2/artifacts/demo/events.sqlite'
-	docker compose -f docker-compose.monitoring.yml up -d --build
+	$(COMPOSE) -f docker-compose.monitoring.yml up -d --build
 	DRIFT_V2_BATCH_SIZE=20 DRIFT_V2_INTERVAL_SECONDS=5 DRIFT_V2_MAX_TICKS=0 $(PYTHON_INTERPRETER) -m drift_v2.cli offline --db-path $${DRIFT_EVENTS_DB:-drift_v2/artifacts/demo/events.sqlite} --config drift_v2/configs/runner.yaml --mode $${DRIFT_MODE:-debug} --run-id $${DRIFT_V2_RUN_ID:-offline_demo_live_v2} --output-root $${DRIFT_V2_OUTPUT_ROOT:-drift_v2/artifacts/runs} --event-span $${DRIFT_V2_EVENT_SPAN:-40} --window-size $${DRIFT_V2_WINDOW_SIZE:-20} --step-size $${DRIFT_V2_STEP_SIZE:-20} --batch-size $${DRIFT_V2_BATCH_SIZE:-20} --interval-seconds $${DRIFT_V2_INTERVAL_SECONDS:-15} --max-ticks $${DRIFT_V2_MAX_TICKS:-0}
 
 ## Restart Grafana/Prometheus/exporter and run infinite online synthetic loop
-drift-monitoring-online:
-	docker compose -f docker-compose.monitoring.yml up -d --build --force-recreate grafana
+drift-monitoring-online: require-compose
+	$(COMPOSE) -f docker-compose.monitoring.yml up -d --build --force-recreate grafana
 	-pkill -f 'python3 -m drift_v2.cli online --db-path drift_v2/artifacts/demo/events.sqlite'
-	docker compose -f docker-compose.monitoring.yml up -d --build
+	$(COMPOSE) -f docker-compose.monitoring.yml up -d --build
 	DRIFT_V2_INTERVAL_SECONDS=5 DRIFT_V2_MAX_TICKS=0 DRIFT_V2_ONLINE_COUNT=20 DRIFT_V2_EXPERT_BATCH_SIZE=20 $(PYTHON_INTERPRETER) -m drift_v2.cli online --db-path $${DRIFT_EVENTS_DB:-drift_v2/artifacts/demo/events.sqlite} --config drift_v2/configs/runner.yaml --mode $${DRIFT_MODE:-debug} --run-id $${DRIFT_V2_ONLINE_RUN_ID:-online_demo_live_v2} --output-root $${DRIFT_V2_OUTPUT_ROOT:-drift_v2/artifacts/runs} --source-mode $${DRIFT_V2_ONLINE_SOURCE_MODE:-online_synthetic_v2} --event-span $${DRIFT_V2_EVENT_SPAN:-40} --window-size $${DRIFT_V2_WINDOW_SIZE:-20} --step-size $${DRIFT_V2_STEP_SIZE:-20} --traffic-count $${DRIFT_V2_ONLINE_COUNT:-20} --expert-batch-size $${DRIFT_V2_EXPERT_BATCH_SIZE:-20} --lookback-minutes $${DRIFT_V2_EXPERT_LOOKBACK_MINUTES:-1440} --hidden-phase $${DRIFT_V2_HIDDEN_PHASE:-A_baseline} --interval-seconds $${DRIFT_V2_INTERVAL_SECONDS:-15} --max-ticks $${DRIFT_V2_MAX_TICKS:-0}
 
 ## Reproduce DVC pipeline (prepare + train)
@@ -198,8 +211,8 @@ help:
 #################################################################################
 
 ## Start MinIO (S3) + MLflow tracking server
-infra-up:
-	docker compose up -d
+infra-up: require-compose
+	$(COMPOSE) up -d
 	@echo "============================================"
 	@echo "Infrastructure started!"
 	@echo "MinIO Console: http://localhost:9001"
@@ -208,21 +221,21 @@ infra-up:
 	@echo "============================================"
 
 ## Stop all infrastructure containers
-infra-down:
-	docker compose down
+infra-down: require-compose
+	$(COMPOSE) down
 
 ## Show status of infrastructure containers
-infra-status:
-	docker compose ps
+infra-status: require-compose
+	$(COMPOSE) ps
 
 ## View MLflow logs
-infra-logs:
-	docker compose logs -f mlflow
+infra-logs: require-compose
+	$(COMPOSE) logs -f mlflow
 
 ## Stop Prometheus + Grafana + drift_v2 exporter
-monitoring-down:
-	docker compose -f docker-compose.monitoring.yml down
+monitoring-down: require-compose
+	$(COMPOSE) -f docker-compose.monitoring.yml down
 
 ## Show monitoring stack container status
-monitoring-status:
-	docker compose -f docker-compose.monitoring.yml ps
+monitoring-status: require-compose
+	$(COMPOSE) -f docker-compose.monitoring.yml ps
