@@ -124,7 +124,7 @@ make k8s-forward
 # Argo CD UI:
 #   URL:      https://localhost:8080
 #   Username: admin
-#   Password: print with the command below
+#   Password: admin
 make argocd-password
 ```
 
@@ -186,7 +186,7 @@ inside the cluster.
 
 **Credentials:**
 - Username: `admin`
-- Password: `make argocd-password`
+- Password: `admin`
 
 ## Configuring Kubernetes Locally
 

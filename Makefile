@@ -230,19 +230,26 @@ monitoring-status:
 k8s-forward:
 	./scripts/k8s-port-forward.sh
 
+## Apply Kubernetes app manifests and bootstrap Argo CD
+k8s-all:
+	kubectl apply -k k8s/base/
+	$(MAKE) argocd-app
+
 ## Install Argo CD into the current Kubernetes cluster
 argocd-install:
 	kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
 	kubectl apply --server-side --force-conflicts -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+	kubectl wait --for=condition=Established crd/applications.argoproj.io --timeout=120s
+	kubectl wait --for=condition=Established crd/appprojects.argoproj.io --timeout=120s
+	kubectl wait -n argocd --for=condition=Available deploy/argocd-server --timeout=300s
 
 ## Register the ml-team application in Argo CD
-argocd-app:
+argocd-app: argocd-install
 	kubectl apply -k argocd/
 
-## Print the initial Argo CD admin password
+## Print the configured Argo CD admin password
 argocd-password:
-	kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath='{.data.password}' | base64 -d
-	@echo
+	@echo admin
 
 ## Force sync and wait for the ml-team application
 argocd-sync:
